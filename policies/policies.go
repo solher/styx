@@ -2,10 +2,13 @@ package policies
 
 import "errors"
 
+// Name represents a policy name.
+type Name string
+
 // Policy represents a set of permissions, assignable to a session.
 type Policy struct {
 	// The policy name.
-	Name string `json:"name,omitempty" yaml:"name"`
+	Name Name `json:"name,omitempty" yaml:"name"`
 	// Can be used to disable a policy.
 	Enabled *bool `json:"enabled,omitempty" yaml:"enabled"`
 	// An array of resource and their associated right.
@@ -29,5 +32,5 @@ var ErrNotFound = errors.New("policy not found")
 
 // Repository provides access to a policy store.
 type Repository interface {
-	FindByName(name string) (*Policy, error)
+	FindByName(name Name) (*Policy, error)
 }
