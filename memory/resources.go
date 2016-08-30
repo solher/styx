@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/solher/styx/resources"
@@ -13,10 +14,19 @@ type resourceRepository struct {
 	resources resourceStore
 }
 
-func (r *resourceRepository) setStore(resources resourceStore) error {
+// SetResources replace the current resource store with the given new resources.
+func SetResources(repo resources.Repository, resources []resources.Resource) error {
+	r, ok := repo.(*resourceRepository)
+	if !ok {
+		return errors.New("unexpected type")
+	}
+	store := resourceStore{}
+	for _, resource := range resources {
+		store[resource.Hostname] = &resource
+	}
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
-	r.resources = resources
+	r.resources = store
 	return nil
 }
 
