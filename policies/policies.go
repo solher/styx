@@ -1,6 +1,6 @@
 package policies
 
-import "errors"
+import "github.com/pkg/errors"
 
 // Name represents a policy name.
 type Name string

@@ -2,8 +2,9 @@ package sessions
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Session associates a unique token, an abstract/custom user payload

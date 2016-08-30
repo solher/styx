@@ -1,8 +1,9 @@
 package memory
 
 import (
-	"errors"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/solher/styx/policies"
 )

@@ -62,13 +62,13 @@ func validateResource(names map[string]struct{}, hostnames map[resources.Hostnam
 			return errors.Wrap(ErrValidation, "resource name cannot be blank")
 		}
 		if len(resource.Hostname) == 0 {
-			return errors.Wrapf(ErrValidation, `resource "%s" hostname cannot be blank`, resource.Name)
+			return errors.Wrapf(ErrValidation, `resource '%s' hostname cannot be blank`, resource.Name)
 		}
 		if _, exists := names[resource.Name]; exists {
-			return errors.Wrapf(ErrValidation, `resource "%s" name must be unique`, resource.Name)
+			return errors.Wrapf(ErrValidation, `resource '%s' name must be unique`, resource.Name)
 		}
 		if _, exists := hostnames[resource.Hostname]; exists {
-			return errors.Wrapf(ErrValidation, `resource "%s" hostname must be unique`, resource.Name)
+			return errors.Wrapf(ErrValidation, `resource '%s' hostname must be unique`, resource.Name)
 		}
 		return nil
 	}
@@ -80,20 +80,20 @@ func validatePolicy(names map[policies.Name]struct{}, resourceNames map[string]s
 			return errors.Wrap(ErrValidation, "policy name cannot be blank")
 		}
 		if policy.Permissions == nil || len(policy.Permissions) == 0 {
-			return errors.Wrapf(ErrValidation, `policy "%s" permissions cannot be blank`, policy.Name)
+			return errors.Wrapf(ErrValidation, `policy '%s' permissions cannot be blank`, policy.Name)
 		}
 		if _, exists := names[policy.Name]; exists {
-			return errors.Wrapf(ErrValidation, `policy "%s" name must be unique`, policy.Name)
+			return errors.Wrapf(ErrValidation, `policy '%s' name must be unique`, policy.Name)
 		}
 		for _, permission := range policy.Permissions {
 			if len(permission.Resource) == 0 {
-				return errors.Wrapf(ErrValidation, `policy "%s": resource cannot be blank`, policy.Name)
+				return errors.Wrapf(ErrValidation, `policy '%s': resource cannot be blank`, policy.Name)
 			}
 			if permission.Resource == "*" {
 				continue
 			}
 			if _, exists := resourceNames[permission.Resource]; !exists {
-				return errors.Wrapf(ErrValidation, `policy "%s": resource "%s" does not exists`, policy.Name, permission.Resource)
+				return errors.Wrapf(ErrValidation, `policy '%s': resource '%s' does not exists`, policy.Name, permission.Resource)
 			}
 		}
 		return nil

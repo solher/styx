@@ -1,6 +1,6 @@
 package resources
 
-import "errors"
+import "github.com/pkg/errors"
 
 // Hostname represents a resource hostname.
 type Hostname string
