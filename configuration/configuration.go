@@ -44,11 +44,13 @@ func FromFile(file []byte) (*Config, error) {
 	// We use a name map to test uniqueness
 	policyNames := make(map[policies.Name]struct{})
 	policyValidator := validatePolicy(policyNames, resourceNames)
-	for _, policy := range config.Policies {
-		if err := policyValidator(&policy); err != nil {
-			return nil, err
+	if config.Policies != nil {
+		for _, policy := range config.Policies {
+			if err := policyValidator(&policy); err != nil {
+				return nil, err
+			}
+			policyNames[policy.Name] = struct{}{}
 		}
-		policyNames[policy.Name] = struct{}{}
 	}
 
 	return config, nil
