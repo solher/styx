@@ -1,0 +1,31 @@
+resources:
+  - name: host1 # Required
+    hostname: host1.foobar.com # Required
+    # Always grants access to the resource without any check
+    # The "Auth-Server-Payload" header is therefore never set by the "auth" method
+    public: true 
+
+  - name: host2
+    hostname: host2.foobar.com
+    redirectUrl: http://www.google.com # The redirected URL when the redirect method is called  
+
+  - name: host3
+    hostname: host3.foobar.com
+    public: false # Default value if not set
+
+policies:
+  # The guest policy is built-in and is checked when the provided token is absent/invalid and the resource is not public
+  - name: guest
+    enabled: true # True if not set
+    permissions: 
+      - resource: host2 # Required
+        deny: true
+      - resource: host2 
+        paths:
+          - /foo/* # Allows to grant/deny access on a path. '/*' if not set
+          - /bar
+
+  - name: admin
+    permissions:
+      - resource: "*" # Wildcards support
+        enabled: false # True if not set
