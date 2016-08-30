@@ -1,4 +1,4 @@
-package configuration
+package config
 
 import (
 	"encoding/json"
@@ -21,9 +21,9 @@ type Config struct {
 // FromFile parses and validates a configuration file.
 func FromFile(file []byte) (*Config, error) {
 	config := &Config{}
-	if err := yaml.Unmarshal(file, config); err != nil {
-		if err := json.Unmarshal(file, config); err != nil {
-			return nil, errors.Wrap(err, "could not parse the config file")
+	if errYAML := yaml.Unmarshal(file, config); errYAML != nil {
+		if errJSON := json.Unmarshal(file, config); errJSON != nil {
+			return nil, errors.New("could not parse the config file: YAML: " + errYAML.Error() + ", JSON: " + errJSON.Error())
 		}
 	}
 
