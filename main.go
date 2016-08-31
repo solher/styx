@@ -25,12 +25,24 @@ import (
 	appdashot "sourcegraph.com/sourcegraph/appdash/opentracing"
 )
 
+const (
+	defaultHTTPAddr    = ":3000"
+	defaultGRPCAddr    = ":8082"
+	defaultAppdashAddr = ""
+	defaultConfigFile  = "./config.yml"
+)
+
 func main() {
 	var (
-		httpAddr = flag.String("http.addr", ":3000", "Address for HTTP server")
-		// grpcAddr    = flag.String("grpc.addr", ":8082", "gRPC (HTTP) listen address")
-		appdashAddr = flag.String("appdash.addr", "", "Enable Appdash tracing via server host:port")
-		configFile  = flag.String("configfile", "./config.yml", "Config file location")
+		httpAddrEnv    = envString("HTTP_ADDR", defaultHTTPAddr)
+		grpcAddrEnv    = envString("GRPC_ADDR", defaultGRPCAddr)
+		appdashAddrEnv = envString("APPDASH_ADDR", defaultAppdashAddr)
+		configFileEnv  = envString("CONFIG_FILE", defaultConfigFile)
+
+		httpAddr    = flag.String("httpAddr", httpAddrEnv, "Address for HTTP server")
+		_           = flag.String("grpc.addr", grpcAddrEnv, "gRPC (HTTP) listen address")
+		appdashAddr = flag.String("appdash.addr", appdashAddrEnv, "Enable Appdash tracing via server host:port")
+		configFile  = flag.String("configfile", configFileEnv, "Config file location")
 	)
 	flag.Parse()
 
@@ -183,4 +195,12 @@ func main() {
 		logger.Log("err", err)
 		exitCode = 1
 	}
+}
+
+func envString(env, fallback string) string {
+	e := os.Getenv(env)
+	if e == "" {
+		return fallback
+	}
+	return e
 }
