@@ -1,12 +1,10 @@
 FROM alpine:latest
 
-ADD https://raw.githubusercontent.com/solher/env2flags/master/env2flags.sh /usr/local/bin/env2flags
-RUN chmod u+x /usr/local/bin/env2flags
-
+RUN mkdir -p /app && touch /app/config.yml
 COPY ./styx /usr/local/bin
 
 WORKDIR /
 
-EXPOSE 8082
-ENTRYPOINT ["env2flags", "--"]
-CMD ["styx"]
+ENV CONFIG_FILE=/app/config.yml
+EXPOSE 3000,8082
+ENTRYPOINT ["styx"]
