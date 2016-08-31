@@ -5,23 +5,29 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
+	"github.com/pressly/chi"
+	"github.com/solher/styx/account"
 	"github.com/solher/styx/config"
 	"github.com/solher/styx/memory"
+	"github.com/solher/styx/redis"
 	"sourcegraph.com/sourcegraph/appdash"
 	appdashot "sourcegraph.com/sourcegraph/appdash/opentracing"
 )
 
 func main() {
 	var (
-		// httpAddr    = flag.String("http.addr", ":3000", "Address for HTTP server")
+		httpAddr = flag.String("http.addr", ":3000", "Address for HTTP server")
 		// grpcAddr    = flag.String("grpc.addr", ":8082", "gRPC (HTTP) listen address")
 		appdashAddr = flag.String("appdash.addr", "", "Enable Appdash tracing via server host:port")
 		configFile  = flag.String("configfile", "./config.yml", "Config file location")
@@ -54,16 +60,66 @@ func main() {
 			tracer = stdopentracing.GlobalTracer() // no-op
 		}
 	}
-	_ = tracer
 
 	// Business domain.
 	policyRepo := memory.NewPolicyRepository()
 	resourceRepo := memory.NewResourceRepository()
 
+	var accountService account.Service
+	{
+		sessionRepo := redis.NewSessionRepository()
+		accountService = account.NewService(sessionRepo)
+	}
+
+	// Endpoint domain.
+	var createSessionEndpoint endpoint.Endpoint
+	{
+		createSessionEndpoint = account.MakeCreateSessionEndpoint(accountService)
+	}
+	var findSessionByTokenEndpoint endpoint.Endpoint
+	{
+		findSessionByTokenEndpoint = account.MakeFindSessionByTokenEndpoint(accountService)
+	}
+	var deleteSessionByTokenEndpoint endpoint.Endpoint
+	{
+		deleteSessionByTokenEndpoint = account.MakeDeleteSessionByTokenEndpoint(accountService)
+	}
+	var deleteSessionsByOwnerTokenEndpoint endpoint.Endpoint
+	{
+		deleteSessionsByOwnerTokenEndpoint = account.MakeDeleteSessionsByOwnerTokenEndpoint(accountService)
+	}
+
+	accountEndpoints := account.Endpoints{
+		CreateSessionEndpoint:              createSessionEndpoint,
+		FindSessionByTokenEndpoint:         findSessionByTokenEndpoint,
+		DeleteSessionByTokenEndpoint:       deleteSessionByTokenEndpoint,
+		DeleteSessionsByOwnerTokenEndpoint: deleteSessionsByOwnerTokenEndpoint,
+	}
+
 	// Mechanical domain.
 	ctx := context.Background()
 	errc := make(chan error)
-	_ = ctx
+
+	// Transport domain.
+	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
+
+	r := chi.NewRouter()
+	r.Mount("/account", accountHandler)
+
+	conn, err := net.Listen("tcp", *httpAddr)
+	if err != nil {
+		logger.Log("err", errors.Wrap(err, "could not create a TCP connection"))
+		exitCode = 1
+		return
+	}
+	defer conn.Close()
+	logger.Log("msg", "listening on "+*httpAddr+" (HTTP)")
+	go func() {
+		if err := http.Serve(conn, r); err != nil {
+			errc <- errors.Wrap(err, "the http server returned an error")
+			return
+		}
+	}()
 
 	// Config watcher.
 	watcher, err := fsnotify.NewWatcher()
