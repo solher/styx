@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -33,8 +34,8 @@ var ErrNotFound = errors.New("session not found")
 
 // Repository provides access to a session store.
 type Repository interface {
-	FindByToken(token string) (*Session, error)
-	Create(session *Session) (*Session, error)
-	DeleteByToken(token string) (*Session, error)
-	DeleteByOwnerToken(ownerToken string) ([]Session, error)
+	Create(ctx context.Context, session *Session) (*Session, error)
+	FindByToken(ctx context.Context, token string) (*Session, error)
+	DeleteByToken(ctx context.Context, token string) (*Session, error)
+	DeleteByOwnerToken(ctx context.Context, ownerToken string) ([]Session, error)
 }
