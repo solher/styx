@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/fsnotify/fsnotify"
+	redigo "github.com/garyburd/redigo/redis"
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	stdopentracing "github.com/opentracing/opentracing-go"
@@ -26,23 +28,29 @@ import (
 )
 
 const (
-	defaultHTTPAddr    = ":3000"
-	defaultGRPCAddr    = ":8082"
-	defaultAppdashAddr = ""
-	defaultConfigFile  = "./config.yml"
+	defaultHTTPAddr     = ":3000"
+	defaultGRPCAddr     = ":8082"
+	defaultAppdashAddr  = ""
+	defaultConfigFile   = "./config.yml"
+	defaultRedisAddr    = "redis:6379"
+	defaultRedisMaxConn = 16
 )
 
 func main() {
 	var (
-		httpAddrEnv    = envString("HTTP_ADDR", defaultHTTPAddr)
-		grpcAddrEnv    = envString("GRPC_ADDR", defaultGRPCAddr)
-		appdashAddrEnv = envString("APPDASH_ADDR", defaultAppdashAddr)
-		configFileEnv  = envString("CONFIG_FILE", defaultConfigFile)
+		httpAddrEnv     = envString("HTTP_ADDR", defaultHTTPAddr)
+		grpcAddrEnv     = envString("GRPC_ADDR", defaultGRPCAddr)
+		appdashAddrEnv  = envString("APPDASH_ADDR", defaultAppdashAddr)
+		configFileEnv   = envString("CONFIG_FILE", defaultConfigFile)
+		redisAddrEnv    = envString("REDIS_ADDR", defaultRedisAddr)
+		redisMaxConnEnv = envInt("REDIS_MAX_CONN", defaultRedisMaxConn)
 
-		httpAddr    = flag.String("httpAddr", httpAddrEnv, "Address for HTTP server")
-		_           = flag.String("grpc.addr", grpcAddrEnv, "gRPC (HTTP) listen address")
-		appdashAddr = flag.String("appdash.addr", appdashAddrEnv, "Enable Appdash tracing via server host:port")
-		configFile  = flag.String("configfile", configFileEnv, "Config file location")
+		httpAddr     = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
+		_            = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
+		appdashAddr  = flag.String("appdashAddr", appdashAddrEnv, "Enable Appdash tracing via server host:port")
+		configFile   = flag.String("configFile", configFileEnv, "Config file location")
+		redisAddr    = flag.String("redisAddr", redisAddrEnv, "Redis server address")
+		redisMaxConn = flag.Int("redisMaxConn", redisMaxConnEnv, "Max simultaneous connections to Redis")
 	)
 	flag.Parse()
 
@@ -73,13 +81,22 @@ func main() {
 		}
 	}
 
+	// Databases.
+	redisPool := &Pool{
+		Dial: func() (redigo.Conn, error) {
+			return redigo.Dial("tcp", *redisAddr)
+		},
+		MaxIdle: *redisMaxConn,
+	}
+	defer redisPool.Close()
+
 	// Business domain.
 	policyRepo := memory.NewPolicyRepository()
 	resourceRepo := memory.NewResourceRepository()
 
 	var accountService account.Service
 	{
-		sessionRepo := redis.NewSessionRepository()
+		sessionRepo := redis.NewSessionRepository(redisPool)
 		accountService = account.NewService(sessionRepo)
 	}
 
@@ -172,9 +189,6 @@ func main() {
 					}
 					logger.Log("msg", "config successfully loaded")
 				}
-			case err := <-watcher.Errors:
-				logger.Log("err", errors.Wrap(err, "watcher returned an error event"))
-				continue
 			}
 		}
 	}()
@@ -203,4 +217,13 @@ func envString(env, fallback string) string {
 		return fallback
 	}
 	return e
+}
+
+func envInt(env string, fallback int) int {
+	e := os.Getenv(env)
+	i, err := strconv.Atoi(e)
+	if e == "" || err != nil {
+		return fallback
+	}
+	return i
 }

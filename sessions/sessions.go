@@ -2,7 +2,6 @@ package sessions
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/pkg/errors"
@@ -26,7 +25,7 @@ type Session struct {
 	// The list of the policy names associated with the session.
 	Policies []string `json:"policies,omitempty"`
 	// A client custom payload. It is not checked or verified.
-	Payload json.RawMessage `json:"payload,omitempty"`
+	Payload []byte `json:"payload,omitempty"`
 }
 
 // ErrNotFound is used when a session could not be found.
