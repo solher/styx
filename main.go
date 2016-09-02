@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	redigo "github.com/garyburd/redigo/redis"
@@ -82,9 +83,13 @@ func main() {
 	}
 
 	// Databases.
-	redisPool := &Pool{
+	redisPool := &redigo.Pool{
 		Dial: func() (redigo.Conn, error) {
 			return redigo.Dial("tcp", *redisAddr)
+		},
+		TestOnBorrow: func(c redigo.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
 		},
 		MaxIdle: *redisMaxConn,
 	}

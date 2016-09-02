@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 
 	redigo "github.com/garyburd/redigo/redis"
@@ -60,17 +58,16 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 		return nil, errors.Wrap(err, "new session marshalling failed")
 	}
 
-	conn.Send("MULTI")
-	_, err = conn.Do("SET", sessionKey(session.Token), string(data), "NX")
+	sessionKey := sessionKey(session.Token)
+	conn.Send("HSETNX", sessionKey, "session", string(data))
+	_, err = conn.Do("HSETNX", sessionKey, "ownerToken", session.OwnerToken)
 	if err != nil {
-		conn.Do("DISCARD")
 		return nil, errors.Wrap(err, "could not set a new session")
 	}
-	conn.Send("EXPIREAT", sessionKey(session.Token), session.ValidTo.Unix())
-	conn.Send("SET", ownerTokenIndexKey(session.OwnerToken, session.Token), "NX")
-	_, err = conn.Do("EXEC")
+	_, err = conn.Do("EXPIREAT", sessionKey, session.ValidTo.Unix())
 	if err != nil {
-		return nil, errors.Wrap(err, "could not set an ownerTokenIndex")
+		conn.Do("DEL", sessionKey)
+		return nil, errors.Wrap(err, "could not set the expiration on the new session")
 	}
 
 	return session, nil
@@ -81,7 +78,7 @@ func (r *sessionRepository) FindByToken(ctx context.Context, token string) (*ses
 	conn := r.pool.Get()
 	defer conn.Close()
 
-	reply, err := redigo.Bytes(conn.Do("GET", sessionKey(token)))
+	reply, err := redigo.Bytes(conn.Do("HGET", "session", sessionKey(token)))
 	if err != nil {
 		return nil, sessions.ErrNotFound
 	}
@@ -90,7 +87,7 @@ func (r *sessionRepository) FindByToken(ctx context.Context, token string) (*ses
 		return nil, errors.Wrap(err, "found session unmarshalling failed")
 	}
 
-	return nil, nil
+	return session, nil
 }
 
 // DeleteByToken deletes a session by its token and returns it.
@@ -112,6 +109,8 @@ func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) (*s
 
 // DeleteByOwnerToken deletes all the sessions marked with the given owner token.
 // Useful to implement delete cascades on user deletions.
+// The implementation is very slow so should probably be runned asynchronously in background.
+// TODO: Find another cleaner way.
 func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken string) ([]sessions.Session, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
@@ -119,16 +118,19 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 	cursor := 0
 	first := true
 	for cursor != 0 || first {
-		values, err := redigo.Values(conn.Do("SCAN", cursor, "MATCH", ownerTokenIndexKey(ownerToken, "*")))
+		values, err := redigo.Values(conn.Do("SCAN", cursor, "MATCH", sessionKey("*")))
 		if err != nil {
 			return nil, errors.Wrap(err, "session scan failed")
 		}
 		cursor = values[0].(int)
 		keys := values[1].([]string)
 		for _, key := range keys {
-			_, err = conn.Do("DEL", tokenFromIndex(key))
+			token, err := redigo.String(conn.Do("HGET", key, "ownerToken"))
 			if err != nil {
-				return nil, errors.Wrap(err, "session deletion by owner token failed")
+				continue
+			}
+			if token == ownerToken {
+				conn.Do("DEL", key)
 			}
 		}
 		if first {
@@ -141,14 +143,6 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 
 func sessionKey(token string) string {
 	return "session:" + token
-}
-
-func ownerTokenIndexKey(ownerToken, token string) string {
-	return fmt.Sprintf("ownerTokenIndex:%s-%s", ownerToken, token)
-}
-
-func tokenFromIndex(ownerTokenIndexKey string) string {
-	return strings.Split(ownerTokenIndexKey, "-")[1]
 }
 
 func genToken(strSize int) string {
