@@ -36,6 +36,11 @@ var (
 		Description: "Could not decode the JSON request.",
 		ErrorCode:   "BODY_DECODING_ERROR",
 	}
+	APIUnauthorized = APIError{
+		Status:      401,
+		Description: "Authorization Required.",
+		ErrorCode:   "AUTHORIZATION_REQUIRED",
+	}
 	APIForbidden = APIError{
 		Status:      403,
 		Description: "The specified resource was not found or you don't have sufficient permissions.",

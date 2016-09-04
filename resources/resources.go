@@ -18,7 +18,7 @@ type Resource struct {
 }
 
 // ErrNotFound is used when a resource could not be found.
-var ErrNotFound = errors.New("resource not found")
+var ErrNotFound = errors.New("resource resource not found")
 
 // Repository provides access to a resource store.
 type Repository interface {

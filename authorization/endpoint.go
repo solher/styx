@@ -12,7 +12,7 @@ import (
 // single parameter.
 type Endpoints struct {
 	AuthorizeTokenEndpoint endpoint.Endpoint
-	RedirectURLEndpoint    endpoint.Endpoint
+	RedirectEndpoint       endpoint.Endpoint
 }
 
 type authorizeTokenRequest struct {
@@ -20,6 +20,7 @@ type authorizeTokenRequest struct {
 }
 
 type authorizeTokenResponse struct {
+	Token   string
 	Session *sessions.Session
 	Err     error
 }
@@ -30,29 +31,31 @@ func MakeAuthorizeTokenEndpoint(s Service) endpoint.Endpoint {
 		req := request.(authorizeTokenRequest)
 		session, err := s.AuthorizeToken(ctx, req.Hostname, req.Path, req.Token)
 		return authorizeTokenResponse{
+			Token:   req.Token,
 			Session: session,
 			Err:     err,
 		}, nil
 	}
 }
 
-type redirectURLRequest struct {
-	Hostname string
+type redirectRequest struct {
+	RequestURL, Hostname string
 }
 
-type redirectURLResponse struct {
-	URL string
-	Err error
+type redirectResponse struct {
+	RequestURL, RedirectURL string
+	Err                     error
 }
 
-// MakeRedirectURLEndpoint returns an endpoint that invokes RedirectURL on the service.
-func MakeRedirectURLEndpoint(s Service) endpoint.Endpoint {
+// MakeRedirectEndpoint returns an endpoint that invokes Redirect on the service.
+func MakeRedirectEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(redirectURLRequest)
-		url, err := s.RedirectURL(ctx, req.Hostname)
-		return redirectURLResponse{
-			URL: url,
-			Err: err,
+		req := request.(redirectRequest)
+		url, err := s.Redirect(ctx, req.Hostname)
+		return redirectResponse{
+			RequestURL:  req.RequestURL,
+			RedirectURL: url,
+			Err:         err,
 		}, nil
 	}
 }

@@ -28,7 +28,7 @@ type Permission struct {
 }
 
 // ErrNotFound is used when a policy could not be found.
-var ErrNotFound = errors.New("policy not found")
+var ErrNotFound = errors.New("policy resource not found")
 
 // Repository provides access to a policy store.
 type Repository interface {

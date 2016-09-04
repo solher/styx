@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	"github.com/solher/styx/account"
+	"github.com/solher/styx/authorization"
 	"github.com/solher/styx/config"
 	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/memory"
@@ -98,7 +99,7 @@ func main() {
 		}
 	}
 
-	// Databases.
+	// Database domain.
 	redisPool := &redigo.Pool{
 		Dial: func() (redigo.Conn, error) {
 			return redigo.Dial("tcp", *redisAddr)
@@ -114,7 +115,10 @@ func main() {
 	// Business domain.
 	policyRepo := memory.NewPolicyRepository()
 	resourceRepo := memory.NewResourceRepository()
-
+	var authorizationService authorization.Service
+	{
+		authorizationService = authorization.NewService(policyRepo, resourceRepo)
+	}
 	var accountService account.Service
 	{
 		sessionRepo := redis.NewSessionRepository(redisPool)
@@ -122,6 +126,21 @@ func main() {
 	}
 
 	// Endpoint domain.
+	var authorizeTokenEndpoint endpoint.Endpoint
+	{
+		authorizeTokenEndpoint = authorization.MakeAuthorizeTokenEndpoint(authorizationService)
+		authorizeTokenEndpoint = helpers.EndpointTracingMiddleware(authorizeTokenEndpoint)
+	}
+	var redirectEndpoint endpoint.Endpoint
+	{
+		redirectEndpoint = authorization.MakeRedirectEndpoint(authorizationService)
+		redirectEndpoint = helpers.EndpointTracingMiddleware(redirectEndpoint)
+	}
+	authorizationEndpoints := authorization.Endpoints{
+		AuthorizeTokenEndpoint: authorizeTokenEndpoint,
+		RedirectEndpoint:       redirectEndpoint,
+	}
+
 	var createSessionEndpoint endpoint.Endpoint
 	{
 		createSessionEndpoint = account.MakeCreateSessionEndpoint(accountService)
@@ -144,7 +163,6 @@ func main() {
 		deleteSessionsByOwnerTokenEndpoint = account.MakeDeleteSessionsByOwnerTokenEndpoint(accountService)
 		deleteSessionsByOwnerTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
 	}
-
 	accountEndpoints := account.Endpoints{
 		CreateSessionEndpoint:              createSessionEndpoint,
 		FindSessionByTokenEndpoint:         findSessionByTokenEndpoint,
@@ -157,10 +175,12 @@ func main() {
 	errc := make(chan error)
 
 	// Transport domain.
+	authorizationHandler := authorization.MakeHTTPHandler(ctx, authorizationEndpoints, tracer, logger)
 	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
 
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
+	r.Mount("/auth", authorizationHandler)
 	r.Mount("/account", accountHandler)
 
 	conn, err := net.Listen("tcp", *httpAddr)
