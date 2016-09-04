@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	zipkin "github.com/openzipkin/zipkin-go-opentracing"
+
 	"github.com/fsnotify/fsnotify"
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/go-kit/kit/endpoint"
@@ -22,16 +24,16 @@ import (
 	"github.com/pressly/chi"
 	"github.com/solher/styx/account"
 	"github.com/solher/styx/config"
+	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/memory"
 	"github.com/solher/styx/redis"
-	"sourcegraph.com/sourcegraph/appdash"
-	appdashot "sourcegraph.com/sourcegraph/appdash/opentracing"
 )
 
 const (
 	defaultHTTPAddr     = ":3000"
 	defaultGRPCAddr     = ":8082"
 	defaultAppdashAddr  = ""
+	defaultZipkinAddr   = ""
 	defaultConfigFile   = "./config.yml"
 	defaultRedisAddr    = "redis:6379"
 	defaultRedisMaxConn = 16
@@ -41,14 +43,14 @@ func main() {
 	var (
 		httpAddrEnv     = envString("HTTP_ADDR", defaultHTTPAddr)
 		grpcAddrEnv     = envString("GRPC_ADDR", defaultGRPCAddr)
-		appdashAddrEnv  = envString("APPDASH_ADDR", defaultAppdashAddr)
+		zipkinAddrEnv   = envString("ZIPKIN_ADDR", defaultZipkinAddr)
 		configFileEnv   = envString("CONFIG_FILE", defaultConfigFile)
 		redisAddrEnv    = envString("REDIS_ADDR", defaultRedisAddr)
 		redisMaxConnEnv = envInt("REDIS_MAX_CONN", defaultRedisMaxConn)
 
 		httpAddr     = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
 		_            = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
-		appdashAddr  = flag.String("appdashAddr", appdashAddrEnv, "Enable Appdash tracing via server host:port")
+		zipkinAddr   = flag.String("zipkinAddr", zipkinAddrEnv, "Enable Zipkin tracing via server host:port")
 		configFile   = flag.String("configFile", configFileEnv, "Config file location")
 		redisAddr    = flag.String("redisAddr", redisAddrEnv, "Redis server address")
 		redisMaxConn = flag.Int("redisMaxConn", redisMaxConnEnv, "Max simultaneous connections to Redis")
@@ -71,10 +73,25 @@ func main() {
 	// Tracing domain.
 	var tracer stdopentracing.Tracer
 	{
-		if *appdashAddr != "" {
-			logger := log.NewContext(logger).With("tracer", "Appdash")
-			logger.Log("msg", "sending trace to "+*appdashAddr)
-			tracer = appdashot.NewTracer(appdash.NewRemoteCollector(*appdashAddr))
+		if *zipkinAddr != "" {
+			logger := log.NewContext(logger).With("tracer", "Zipkin")
+			logger.Log("msg", "sending trace to "+*zipkinAddr)
+			collector, err := zipkin.NewScribeCollector(
+				*zipkinAddr,
+				3*time.Second,
+				zipkin.ScribeLogger(logger),
+			)
+			if err != nil {
+				logger.Log("err", errors.Wrap(err, "could create the Zipkin collector"))
+				exitCode = 1
+				return
+			}
+			tracer, err = zipkin.NewTracer(zipkin.NewRecorder(collector, false, "localhost:80", "styx"))
+			if err != nil {
+				logger.Log("err", errors.Wrap(err, "could not create the Zipkin tracer"))
+				exitCode = 1
+				return
+			}
 		} else {
 			logger := log.NewContext(logger).With("tracer", "none")
 			logger.Log("msg", "tracing disabled")
@@ -109,18 +126,24 @@ func main() {
 	var createSessionEndpoint endpoint.Endpoint
 	{
 		createSessionEndpoint = account.MakeCreateSessionEndpoint(accountService)
+		createSessionEndpoint = helpers.EndpointTracingMiddleware(createSessionEndpoint)
 	}
 	var findSessionByTokenEndpoint endpoint.Endpoint
 	{
 		findSessionByTokenEndpoint = account.MakeFindSessionByTokenEndpoint(accountService)
+		findSessionByTokenEndpoint = helpers.EndpointTracingMiddleware(findSessionByTokenEndpoint)
+
 	}
 	var deleteSessionByTokenEndpoint endpoint.Endpoint
 	{
 		deleteSessionByTokenEndpoint = account.MakeDeleteSessionByTokenEndpoint(accountService)
+		deleteSessionByTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionByTokenEndpoint)
+
 	}
 	var deleteSessionsByOwnerTokenEndpoint endpoint.Endpoint
 	{
 		deleteSessionsByOwnerTokenEndpoint = account.MakeDeleteSessionsByOwnerTokenEndpoint(accountService)
+		deleteSessionsByOwnerTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
 	}
 
 	accountEndpoints := account.Endpoints{

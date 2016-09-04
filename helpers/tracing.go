@@ -2,16 +2,20 @@ package helpers
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"golang.org/x/net/context"
 
+	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/tracing/opentracing"
 	httptransport "github.com/go-kit/kit/transport/http"
 	stdopentracing "github.com/opentracing/opentracing-go"
+	"github.com/pkg/errors"
 )
 
 func FromHTTPRequest(tracer stdopentracing.Tracer, operationName string, logger log.Logger) httptransport.RequestFunc {
@@ -35,7 +39,30 @@ func FromHTTPRequest(tracer stdopentracing.Tracer, operationName string, logger 
 
 func TraceError(ctx context.Context, err error) {
 	if span := stdopentracing.SpanFromContext(ctx); span != nil {
+		type stackTracer interface {
+			StackTrace() errors.StackTrace
+		}
+		if e, ok := err.(stackTracer); ok {
+			st := e.StackTrace()[0]
+			split := strings.Split(fmt.Sprintf("%+v", st), "\t")
+			if len(split) == 2 {
+				span = span.SetTag("errorLocation", split[1])
+			}
+		}
 		span = span.SetTag("error", err.Error())
 		ctx = stdopentracing.ContextWithSpan(ctx, span)
+	}
+}
+
+func EndpointTracingMiddleware(next endpoint.Endpoint) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		defer func() {
+			if err != nil {
+				if span := stdopentracing.SpanFromContext(ctx); span != nil {
+					span.SetTag("error", err.Error())
+				}
+			}
+		}()
+		return next(ctx, request)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	redigo "github.com/garyburd/redigo/redis"
@@ -78,16 +79,7 @@ func (r *sessionRepository) FindByToken(ctx context.Context, token string) (*ses
 	conn := r.pool.Get()
 	defer conn.Close()
 
-	reply, err := redigo.Bytes(conn.Do("HGET", "session", sessionKey(token)))
-	if err != nil {
-		return nil, sessions.ErrNotFound
-	}
-	var session *sessions.Session
-	if err := json.Unmarshal(reply, session); err != nil {
-		return nil, errors.Wrap(err, "found session unmarshalling failed")
-	}
-
-	return session, nil
+	return getSession(conn, sessionKey(token))
 }
 
 // DeleteByToken deletes a session by its token and returns it.
@@ -95,7 +87,7 @@ func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) (*s
 	conn := r.pool.Get()
 	defer conn.Close()
 
-	session, err := r.FindByToken(ctx, token)
+	session, err := getSession(conn, sessionKey(token))
 	if err != nil {
 		return nil, err
 	}
@@ -115,30 +107,51 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 	conn := r.pool.Get()
 	defer conn.Close()
 
-	cursor := 0
-	first := true
-	for cursor != 0 || first {
+	deleted := []sessions.Session{}
+	var (
+		cursor int64
+		keys   []string
+	)
+	for {
 		values, err := redigo.Values(conn.Do("SCAN", cursor, "MATCH", sessionKey("*")))
 		if err != nil {
 			return nil, errors.Wrap(err, "session scan failed")
 		}
-		cursor = values[0].(int)
-		keys := values[1].([]string)
+		values, err = redigo.Scan(values, &cursor, &keys)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get the scan values")
+		}
 		for _, key := range keys {
 			token, err := redigo.String(conn.Do("HGET", key, "ownerToken"))
 			if err != nil {
 				continue
 			}
+			fmt.Println(token)
+			fmt.Println(ownerToken)
 			if token == ownerToken {
+				session, _ := getSession(conn, key)
 				conn.Do("DEL", key)
+				deleted = append(deleted, *session)
 			}
 		}
-		if first {
-			first = false
+		if cursor == 0 {
+			break
 		}
 	}
 
-	return nil, nil
+	return deleted, nil
+}
+
+func getSession(conn redigo.Conn, key string) (*sessions.Session, error) {
+	reply, err := redigo.Bytes(conn.Do("HGET", key, "session"))
+	if err != nil {
+		return nil, errors.Wrap(sessions.ErrNotFound, err.Error())
+	}
+	session := &sessions.Session{}
+	if err := json.Unmarshal(reply, session); err != nil {
+		return nil, errors.Wrap(err, "found session unmarshalling failed")
+	}
+	return session, nil
 }
 
 func sessionKey(token string) string {

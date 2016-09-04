@@ -29,7 +29,7 @@ type Session struct {
 }
 
 // ErrNotFound is used when a session could not be found.
-var ErrNotFound = errors.New("session not found")
+var ErrNotFound = errors.New("session resource not found")
 
 // Repository provides access to a session store.
 type Repository interface {

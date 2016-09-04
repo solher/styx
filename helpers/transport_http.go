@@ -3,7 +3,6 @@ package helpers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	stdopentracing "github.com/opentracing/opentracing-go"
@@ -21,27 +20,28 @@ type APIError struct {
 	Params map[string]interface{} `json:"params,omitempty"`
 }
 
-func (e APIError) Error() string {
-	return fmt.Sprintf("%s : %s", e.ErrorCode, e.Description)
-}
-
 var (
-	ErrInternal = APIError{
+	APIInternal = APIError{
 		Status:      500,
 		Description: "An internal error occured. Please retry later.",
 		ErrorCode:   "INTERNAL_ERROR",
 	}
-	ErrBodyDecoding = APIError{
+	APIUnavailable = APIError{
+		Status:      503,
+		Description: "The service is currently unavailable. Please retry later.",
+		ErrorCode:   "SERVICE_UNAVAILABLE",
+	}
+	APIBodyDecoding = APIError{
 		Status:      400,
 		Description: "Could not decode the JSON request.",
 		ErrorCode:   "BODY_DECODING_ERROR",
 	}
-	ErrForbidden = APIError{
+	APIForbidden = APIError{
 		Status:      403,
 		Description: "The specified resource was not found or you don't have sufficient permissions.",
 		ErrorCode:   "FORBIDDEN",
 	}
-	ErrValidation = APIError{
+	APIValidation = APIError{
 		Status:      422,
 		Description: "The model validation failed.",
 		ErrorCode:   "VALIDATION_ERROR",
