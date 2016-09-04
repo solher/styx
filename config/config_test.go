@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -65,28 +64,26 @@ policies:
 
 // TestFromFile runs tests on the FromFile function.
 func TestFromFile(t *testing.T) {
-	var tests = []struct {
+	var testCases = []struct {
+		name   string         // Test case name
 		file   string         // Input file
 		config *config.Config // Expected result
 		err    bool           // Expected error presence
 	}{
-		{file: emptyFile, config: emptyConfig, err: false},
-		{file: exampleFile, config: exampleConfig, err: false},
+		{name: "empty file", file: emptyFile, config: emptyConfig, err: false},
+		{name: "example file", file: exampleFile, config: exampleConfig, err: false},
 	}
 
-	for i, test := range tests {
-		config, err := config.FromFile([]byte(test.file))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config, err := config.FromFile([]byte(tc.file))
 
-		errPresent := (err != nil)
-		if !errPresent {
-			err = errors.New("nil")
-		}
-		if errPresent != test.err {
-			t.Errorf(`Test %d: expected err presence to be %v, got "%s"`, i, test.err, err.Error())
-		}
-
-		if !reflect.DeepEqual(config, test.config) {
-			t.Errorf(`Test %d: expected config to be %v, got %v`, i, test.config, config)
-		}
+			if (err != nil) != tc.err {
+				t.Errorf(`expected err presence to be %v, got "%s"`, tc.err, err)
+			}
+			if !reflect.DeepEqual(config, tc.config) {
+				t.Errorf(`expected config to be %v, got %v`, tc.config, config)
+			}
+		})
 	}
 }
