@@ -32,7 +32,6 @@ import (
 const (
 	defaultHTTPAddr     = ":3000"
 	defaultGRPCAddr     = ":8082"
-	defaultAppdashAddr  = ""
 	defaultZipkinAddr   = ""
 	defaultConfigFile   = "./config.yml"
 	defaultRedisAddr    = "redis:6379"
