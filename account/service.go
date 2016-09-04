@@ -25,18 +25,23 @@ func NewService(sessionRepo sessions.Repository) Service {
 	}
 }
 
+// CreateSession creates a new session.
 func (s *service) CreateSession(ctx context.Context, session *sessions.Session) (*sessions.Session, error) {
 	return s.sessionRepo.Create(ctx, session)
 }
 
+// FindSessionByToken finds a session by its token and returns it.
 func (s *service) FindSessionByToken(ctx context.Context, token string) (*sessions.Session, error) {
 	return s.sessionRepo.FindByToken(ctx, token)
 }
 
+// DeleteSessionByToken deletes a session by its token and returns it.
 func (s *service) DeleteSessionByToken(ctx context.Context, token string) (*sessions.Session, error) {
 	return s.sessionRepo.DeleteByToken(ctx, token)
 }
 
+// DeleteSessionsByOwnerToken deletes all the sessions having the same ownerToken.
+// Useful to implement delete cascades on user deletions.
 func (s *service) DeleteSessionsByOwnerToken(ctx context.Context, ownerToken string) ([]sessions.Session, error) {
 	return s.sessionRepo.DeleteByOwnerToken(ctx, ownerToken)
 }
