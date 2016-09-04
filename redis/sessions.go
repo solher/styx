@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	redigo "github.com/garyburd/redigo/redis"
@@ -41,6 +40,10 @@ func (r *sessionRepository) SetDefaultSessionValidity(sessionValidity time.Durat
 }
 
 // Create creates a new session and returns it.
+// Each time we create a new session, we add the corresponding key in a ownerToken index to allow
+// fast DeleteByOwnerToken operations.
+// The problem is that we can't set an expiration on hash fields so we have to clear the index at each login.
+// The logical effect is that after each login, we are sure that the index contains only active sessions.
 func (r *sessionRepository) Create(ctx context.Context, session *sessions.Session) (*sessions.Session, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
@@ -59,16 +62,52 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 		return nil, errors.Wrap(err, "new session marshalling failed")
 	}
 
+	// We set the new session and the associated index
+	expiration := int(session.ValidTo.Sub(now).Seconds())
 	sessionKey := sessionKey(session.Token)
-	conn.Send("HSETNX", sessionKey, "session", string(data))
-	_, err = conn.Do("HSETNX", sessionKey, "ownerToken", session.OwnerToken)
+	ownerSessionsKey := ownerSessionsKey(session.OwnerToken)
+	_, err = conn.Do("SET", sessionKey, string(data), "EX", expiration, "NX")
 	if err != nil {
 		return nil, errors.Wrap(err, "could not set a new session")
 	}
-	_, err = conn.Do("EXPIREAT", sessionKey, session.ValidTo.Unix())
+	_, err = conn.Do("HSETNX", ownerSessionsKey, sessionKey, "")
 	if err != nil {
 		conn.Do("DEL", sessionKey)
-		return nil, errors.Wrap(err, "could not set the expiration on the new session")
+		return nil, errors.Wrap(err, "could not set the session in the ownerToken index")
+	}
+	ttl, err := redigo.Int(conn.Do("TTL", ownerSessionsKey))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get the TTL of the ownerToken index")
+	}
+	if ttl < expiration {
+		_, err := conn.Do("EXPIRE", ownerSessionsKey, expiration)
+		if err != nil {
+			conn.Do("DEL", sessionKey)
+			conn.Do("HDEL", ownerSessionsKey, sessionKey)
+			return nil, errors.Wrap(err, "could refresh the TTL of the ownerToken index")
+		}
+	}
+
+	// We clear the associated index
+	sessionKeys, err := redigo.Strings(conn.Do("HKEYS", ownerSessionsKey))
+	if err != nil {
+		return session, nil
+	}
+	for _, key := range sessionKeys {
+		conn.Send("EXISTS", key)
+	}
+	ints, err := redigo.Ints(conn.Do(""))
+	if err != nil {
+		return session, nil
+	}
+	toDelete := []interface{}{}
+	for i, exists := range ints {
+		if exists == 0 {
+			toDelete = append(toDelete, sessionKeys[i])
+		}
+	}
+	if len(toDelete) > 0 {
+		conn.Do("HDEL", append([]interface{}{ownerSessionsKey}, toDelete...)...)
 	}
 
 	return session, nil
@@ -101,54 +140,42 @@ func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) (*s
 
 // DeleteByOwnerToken deletes all the sessions marked with the given owner token.
 // Useful to implement delete cascades on user deletions.
-// The implementation is very slow so should probably be runned asynchronously in background.
-// TODO: Find another cleaner way.
 func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken string) ([]sessions.Session, error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
 	deleted := []sessions.Session{}
-	var (
-		cursor int64
-		keys   []string
-	)
-	for {
-		values, err := redigo.Values(conn.Do("SCAN", cursor, "MATCH", sessionKey("*")))
-		if err != nil {
-			return nil, errors.Wrap(err, "session scan failed")
-		}
-		values, err = redigo.Scan(values, &cursor, &keys)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not get the scan values")
-		}
-		for _, key := range keys {
-			token, err := redigo.String(conn.Do("HGET", key, "ownerToken"))
-			if err != nil {
-				continue
-			}
-			fmt.Println(token)
-			fmt.Println(ownerToken)
-			if token == ownerToken {
-				session, _ := getSession(conn, key)
-				conn.Do("DEL", key)
-				deleted = append(deleted, *session)
-			}
-		}
-		if cursor == 0 {
-			break
-		}
+	ownerSessionsKey := ownerSessionsKey(ownerToken)
+	sessionKeys, err := redigo.Values(conn.Do("HKEYS", ownerSessionsKey))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get the ownerToken index")
 	}
+	if sessionKeys == nil || len(sessionKeys) == 0 {
+		return deleted, nil
+	}
+	vals, err := redigo.ByteSlices(conn.Do("MGET", sessionKeys...))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get the sessions by ownerToken")
+	}
+	for _, val := range vals {
+		session := sessions.Session{}
+		if err := json.Unmarshal(val, &session); err != nil {
+			return nil, errors.Wrap(err, "found session unmarshalling failed")
+		}
+		deleted = append(deleted, session)
+	}
+	conn.Do("DEL", append([]interface{}{ownerSessionsKey}, sessionKeys...)...)
 
 	return deleted, nil
 }
 
 func getSession(conn redigo.Conn, key string) (*sessions.Session, error) {
-	reply, err := redigo.Bytes(conn.Do("HGET", key, "session"))
+	val, err := redigo.Bytes(conn.Do("GET", key))
 	if err != nil {
 		return nil, errors.Wrap(sessions.ErrNotFound, err.Error())
 	}
 	session := &sessions.Session{}
-	if err := json.Unmarshal(reply, session); err != nil {
+	if err := json.Unmarshal(val, session); err != nil {
 		return nil, errors.Wrap(err, "found session unmarshalling failed")
 	}
 	return session, nil
@@ -156,6 +183,10 @@ func getSession(conn redigo.Conn, key string) (*sessions.Session, error) {
 
 func sessionKey(token string) string {
 	return "session:" + token
+}
+
+func ownerSessionsKey(ownerToken string) string {
+	return "ownerSessions:" + ownerToken
 }
 
 func genToken(strSize int) string {
