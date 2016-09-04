@@ -161,6 +161,7 @@ func main() {
 	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
 
 	r := chi.NewRouter()
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
 	r.Mount("/account", accountHandler)
 
 	conn, err := net.Listen("tcp", *httpAddr)
