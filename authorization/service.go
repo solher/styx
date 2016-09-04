@@ -11,7 +11,7 @@ import (
 // Service represents the authorization service interface.
 type Service interface {
 	AuthorizeToken(ctx context.Context, hostname, path, token string) (*sessions.Session, error)
-	GetRedirectURL(ctx context.Context, hostname string) (string, error)
+	RedirectURL(ctx context.Context, hostname string) (string, error)
 }
 
 type service struct {
@@ -32,8 +32,8 @@ func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token stri
 	return nil, nil
 }
 
-// GetRedirectURL returns the URL to which the user must be redirected in case of a denied
+// RedirectURL returns the URL to which the user must be redirected in case of a denied
 // access to the given hostname.
-func (s *service) GetRedirectURL(ctx context.Context, hostname string) (string, error) {
+func (s *service) RedirectURL(ctx context.Context, hostname string) (string, error) {
 	return "", nil
 }
