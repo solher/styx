@@ -1,16 +1,17 @@
 package resources
 
-import "github.com/pkg/errors"
+import (
+	"context"
 
-// Hostname represents a resource hostname.
-type Hostname string
+	"github.com/pkg/errors"
+)
 
 // Resource represents a host defined by his hostname.
 type Resource struct {
 	// The resource name. Must be unique.
 	Name string `json:"name,omitempty" yaml:"name"`
 	// The resource host name. Ex: 'resource.example.com'
-	Hostname Hostname `json:"hostname,omitempty" yaml:"hostname"`
+	Hostname string `json:"hostname,omitempty" yaml:"hostname"`
 	// Disable the authentication for that resource.
 	Public *bool `json:"public,omitempty" yaml:"public"`
 	// The redirection URL when access is denied to the resource.
@@ -22,5 +23,5 @@ var ErrNotFound = errors.New("resource resource not found")
 
 // Repository provides access to a resource store.
 type Repository interface {
-	FindByHostname(hostname Hostname) (*Resource, error)
+	FindByHostname(ctx context.Context, hostname string) (*Resource, error)
 }

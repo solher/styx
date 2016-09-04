@@ -82,7 +82,12 @@ func EncodeHTTPCreateSessionResponse(ctx context.Context, w http.ResponseWriter,
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	return encodeSession(ctx, w, 201, res.Session)
+	if err := encodeSession(w, res.Session); err != nil {
+		return err
+	}
+	defer helpers.TraceStatusAndFinish(ctx, 201)
+	w.WriteHeader(201)
+	return nil
 }
 
 // DecodeHTTPFindSessionByTokenRequest is a transport/http.DecodeRequestFunc that decodes the
@@ -100,7 +105,12 @@ func EncodeHTTPFindSessionByTokenResponse(ctx context.Context, w http.ResponseWr
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	return encodeSession(ctx, w, 200, res.Session)
+	if err := encodeSession(w, res.Session); err != nil {
+		return err
+	}
+	defer helpers.TraceStatusAndFinish(ctx, 200)
+	w.WriteHeader(200)
+	return nil
 }
 
 // DecodeHTTPDeleteSessionByTokenRequest is a transport/http.DecodeRequestFunc that decodes the
@@ -118,7 +128,12 @@ func EncodeHTTPDeleteSessionByTokenResponse(ctx context.Context, w http.Response
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	return encodeSession(ctx, w, 200, res.Session)
+	if err := encodeSession(w, res.Session); err != nil {
+		return err
+	}
+	defer helpers.TraceStatusAndFinish(ctx, 200)
+	w.WriteHeader(200)
+	return nil
 }
 
 // DecodeHTTPDeleteSessionsByOwnerTokenRequest is a transport/http.DecodeRequestFunc that decodes the
@@ -136,7 +151,12 @@ func EncodeHTTPDeleteSessionsByOwnerTokenResponse(ctx context.Context, w http.Re
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	return encodeSessions(ctx, w, 200, res.Sessions)
+	if err := encodeSessions(w, res.Sessions); err != nil {
+		return err
+	}
+	defer helpers.TraceStatusAndFinish(ctx, 200)
+	w.WriteHeader(200)
+	return nil
 }
 
 func transportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
@@ -151,7 +171,11 @@ func transportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter
 		err = e.Err
 	}
 	helpers.TraceError(ctx, err)
-	helpers.EncodeAPIError(ctx, apiError, w)
+	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(apiError.Status)
+	json.NewEncoder(w).Encode(apiError)
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
@@ -162,19 +186,23 @@ func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter)
 	default:
 		return err
 	}
-	return helpers.EncodeAPIError(ctx, apiError, w)
+	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(apiError.Status)
+	return json.NewEncoder(w).Encode(apiError)
 }
 
-func encodeSession(ctx context.Context, w http.ResponseWriter, status int, session *sessions.Session) error {
-	helpers.EncodeHTTPHeaders(ctx, w, status)
+func encodeSession(w http.ResponseWriter, session *sessions.Session) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(session); err != nil {
 		return errors.Wrap(err, "session encoding failed")
 	}
 	return nil
 }
 
-func encodeSessions(ctx context.Context, w http.ResponseWriter, status int, sessions []sessions.Session) error {
-	helpers.EncodeHTTPHeaders(ctx, w, status)
+func encodeSessions(w http.ResponseWriter, sessions []sessions.Session) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(sessions); err != nil {
 		return errors.Wrap(err, "session encoding failed")
 	}

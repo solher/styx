@@ -80,19 +80,22 @@ func EncodeHTTPAuthorizeTokenResponse(ctx context.Context, w http.ResponseWriter
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
 
-	if res.Session.Payload != nil {
-		payload := base64.StdEncoding.EncodeToString(res.Session.Payload)
-		w.Header().Add("Styx-Payload", payload)
+	w.Header().Add("Styx-Access-Token", res.Token)
+	if res.Session != nil {
+		if res.Session.Payload != nil {
+			payload := base64.StdEncoding.EncodeToString(res.Session.Payload)
+			w.Header().Add("Styx-Payload", payload)
+		}
+
+		res.Session.Policies = nil
+		res.Session.Payload = nil
+		s, _ := json.Marshal(res.Session)
+		enc := base64.StdEncoding.EncodeToString(s)
+		w.Header().Add("Styx-Session", enc)
 	}
 
-	res.Session.Policies = nil
-	res.Session.Payload = nil
-	s, _ := json.Marshal(res.Session)
-	enc := base64.StdEncoding.EncodeToString(s)
-	w.Header().Add("Styx-Session", enc)
-
-	w.Header().Add("Styx-Access-Token", res.Token)
-
+	defer helpers.TraceStatusAndFinish(ctx, 204)
+	w.WriteHeader(204)
 	return nil
 }
 
@@ -119,6 +122,8 @@ func EncodeHTTPRedirectResponse(ctx context.Context, w http.ResponseWriter, resp
 	}
 	w.Header().Add("Location", res.RedirectURL+"?redirectUrl="+res.RequestURL)
 	w.Header().Add("Redirect-Url", res.RequestURL)
+
+	defer helpers.TraceStatusAndFinish(ctx, 307)
 	w.WriteHeader(307)
 	return nil
 }
@@ -135,7 +140,11 @@ func transportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter
 		err = e.Err
 	}
 	helpers.TraceError(ctx, err)
-	helpers.EncodeAPIError(ctx, apiError, w)
+	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(apiError.Status)
+	json.NewEncoder(w).Encode(apiError)
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
@@ -146,11 +155,15 @@ func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter)
 	default:
 		return err
 	}
-	return helpers.EncodeAPIError(ctx, apiError, w)
+	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(apiError.Status)
+	return json.NewEncoder(w).Encode(apiError)
 }
 
-func encodeSession(ctx context.Context, w http.ResponseWriter, status int, session *sessions.Session) error {
-	helpers.EncodeHTTPHeaders(ctx, w, status)
+func encodeSession(w http.ResponseWriter, session *sessions.Session) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(session); err != nil {
 		return errors.Wrap(err, "session encoding failed")
 	}

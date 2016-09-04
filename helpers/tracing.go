@@ -37,6 +37,25 @@ func FromHTTPRequest(tracer stdopentracing.Tracer, operationName string, logger 
 	}
 }
 
+func TraceStatusAndFinish(ctx context.Context, status int) {
+	if span := stdopentracing.SpanFromContext(ctx); span != nil {
+		span = span.SetTag("res.status", status)
+		span.Finish()
+	}
+}
+
+func TraceAPIErrorAndFinish(ctx context.Context, err APIError) {
+	if span := stdopentracing.SpanFromContext(ctx); span != nil {
+		if span := stdopentracing.SpanFromContext(ctx); span != nil {
+			span = span.SetTag("res.status", err.Status)
+			span = span.SetTag("res.description", err.Description)
+			span = span.SetTag("res.errorCode", err.ErrorCode)
+			span = span.SetTag("res.params", err.Params)
+			span.Finish()
+		}
+	}
+}
+
 func TraceError(ctx context.Context, err error) {
 	if span := stdopentracing.SpanFromContext(ctx); span != nil {
 		type stackTracer interface {
@@ -50,7 +69,6 @@ func TraceError(ctx context.Context, err error) {
 			}
 		}
 		span = span.SetTag("error", err.Error())
-		ctx = stdopentracing.ContextWithSpan(ctx, span)
 	}
 }
 
@@ -58,9 +76,7 @@ func EndpointTracingMiddleware(next endpoint.Endpoint) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		defer func() {
 			if err != nil {
-				if span := stdopentracing.SpanFromContext(ctx); span != nil {
-					span.SetTag("error", err.Error())
-				}
+				TraceError(ctx, err)
 			}
 		}()
 		return next(ctx, request)

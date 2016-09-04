@@ -1,13 +1,5 @@
 package helpers
 
-import (
-	"context"
-	"encoding/json"
-	"net/http"
-
-	stdopentracing "github.com/opentracing/opentracing-go"
-)
-
 // APIError defines a standard format for API errors.
 type APIError struct {
 	// The status code.
@@ -52,29 +44,3 @@ var (
 		ErrorCode:   "VALIDATION_ERROR",
 	}
 )
-
-func EncodeAPIError(ctx context.Context, err APIError, w http.ResponseWriter) error {
-	defer func() {
-		if span := stdopentracing.SpanFromContext(ctx); span != nil {
-			span = span.SetTag("res.status", err.Status)
-			span = span.SetTag("res.description", err.Description)
-			span = span.SetTag("res.errorCode", err.ErrorCode)
-			span = span.SetTag("res.params", err.Params)
-			span.Finish()
-		}
-	}()
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(err.Status)
-	return json.NewEncoder(w).Encode(err)
-}
-
-func EncodeHTTPHeaders(ctx context.Context, w http.ResponseWriter, status int) {
-	defer func() {
-		if span := stdopentracing.SpanFromContext(ctx); span != nil {
-			span = span.SetTag("res.status", status)
-			span.Finish()
-		}
-	}()
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-}

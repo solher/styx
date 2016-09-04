@@ -29,7 +29,7 @@ func FromFile(file []byte) (*Config, error) {
 
 	// We use name and hostname maps to test uniqueness
 	resourceNames := make(map[string]struct{})
-	resourceHostnames := make(map[resources.Hostname]struct{})
+	resourceHostnames := make(map[string]struct{})
 	resourceValidator := validateResource(resourceNames, resourceHostnames)
 	if config.Resources != nil {
 		for _, resource := range config.Resources {
@@ -42,7 +42,7 @@ func FromFile(file []byte) (*Config, error) {
 	}
 
 	// We use a name map to test uniqueness
-	policyNames := make(map[policies.Name]struct{})
+	policyNames := make(map[string]struct{})
 	policyValidator := validatePolicy(policyNames, resourceNames)
 	if config.Policies != nil {
 		for _, policy := range config.Policies {
@@ -56,7 +56,7 @@ func FromFile(file []byte) (*Config, error) {
 	return config, nil
 }
 
-func validateResource(names map[string]struct{}, hostnames map[resources.Hostname]struct{}) func(resource *resources.Resource) error {
+func validateResource(names, hostnames map[string]struct{}) func(resource *resources.Resource) error {
 	return func(resource *resources.Resource) error {
 		if len(resource.Name) == 0 {
 			return errors.Wrap(ErrValidation, "resource name cannot be blank")
@@ -74,7 +74,7 @@ func validateResource(names map[string]struct{}, hostnames map[resources.Hostnam
 	}
 }
 
-func validatePolicy(names map[policies.Name]struct{}, resourceNames map[string]struct{}) func(policy *policies.Policy) error {
+func validatePolicy(names, resourceNames map[string]struct{}) func(policy *policies.Policy) error {
 	return func(policy *policies.Policy) error {
 		if len(policy.Name) == 0 {
 			return errors.Wrap(ErrValidation, "policy name cannot be blank")

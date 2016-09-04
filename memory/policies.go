@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -8,7 +9,10 @@ import (
 	"github.com/solher/styx/policies"
 )
 
-type policyStore map[policies.Name]*policies.Policy
+type (
+	policyName  string
+	policyStore map[policyName]*policies.Policy
+)
 
 type policyRepository struct {
 	mtx      sync.RWMutex
@@ -23,7 +27,7 @@ func SetPolicies(repo policies.Repository, policies []policies.Policy) error {
 	}
 	store := policyStore{}
 	for _, policy := range policies {
-		store[policy.Name] = &policy
+		store[policyName(policy.Name)] = &policy
 	}
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
@@ -34,15 +38,15 @@ func SetPolicies(repo policies.Repository, policies []policies.Policy) error {
 // NewPolicyRepository returns a new instance of a in-memory policy repository.
 func NewPolicyRepository() policies.Repository {
 	return &policyRepository{
-		policies: make(map[policies.Name]*policies.Policy),
+		policies: make(map[policyName]*policies.Policy),
 	}
 }
 
 // FindByName finds a policy by its name and returns it.
-func (r *policyRepository) FindByName(name policies.Name) (*policies.Policy, error) {
+func (r *policyRepository) FindByName(ctx context.Context, name string) (*policies.Policy, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
-	policy, ok := r.policies[name]
+	policy, ok := r.policies[policyName(name)]
 	if !ok {
 		return nil, policies.ErrNotFound
 	}
