@@ -49,7 +49,10 @@ func MakeFindSessionByTokenEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(findSessionByTokenRequest)
 		session, err := s.FindSessionByToken(ctx, req.Token)
-		return findSessionByTokenResponse{Session: session, Err: err}, nil
+		return findSessionByTokenResponse{
+			Session: session,
+			Err:     err,
+		}, nil
 	}
 }
 
@@ -67,7 +70,10 @@ func MakeDeleteSessionByTokenEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(deleteSessionByTokenRequest)
 		session, err := s.DeleteSessionByToken(ctx, req.Token)
-		return deleteSessionByTokenResponse{Session: session, Err: err}, nil
+		return deleteSessionByTokenResponse{
+			Session: session,
+			Err:     err,
+		}, nil
 	}
 }
 
@@ -85,6 +91,9 @@ func MakeDeleteSessionsByOwnerTokenEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(deleteSessionsByOwnerTokenRequest)
 		sessions, err := s.DeleteSessionsByOwnerToken(ctx, req.OwnerToken)
-		return deleteSessionsByOwnerTokenResponse{Sessions: sessions, Err: err}, nil
+		return deleteSessionsByOwnerTokenResponse{
+			Sessions: sessions,
+			Err:      err,
+		}, nil
 	}
 }
