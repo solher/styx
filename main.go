@@ -115,13 +115,14 @@ func main() {
 	// Business domain.
 	policyRepo := memory.NewPolicyRepository()
 	resourceRepo := memory.NewResourceRepository()
-	sessionRepo := redis.NewSessionRepository(redisPool)
 	var authorizationService authorization.Service
 	{
+		sessionRepo := redis.NewSessionRepository(redisPool)
 		authorizationService = authorization.NewService(policyRepo, resourceRepo, sessionRepo)
 	}
 	var accountService account.Service
 	{
+		sessionRepo := redis.NewSessionRepository(redisPool)
 		accountService = account.NewService(sessionRepo)
 	}
 
