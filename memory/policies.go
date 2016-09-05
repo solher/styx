@@ -6,8 +6,23 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/policies"
 )
+
+type errNotFoundBehavior struct{}
+
+func (err errNotFoundBehavior) IsErrNotFound() {}
+
+type errPolicyNotFound struct {
+	helpers.ErrBehavior
+	errNotFoundBehavior
+}
+
+func newErrPolicyNotFound(msg string) (err errPolicyNotFound) {
+	defer func() { err.Msg = msg }()
+	return errPolicyNotFound{}
+}
 
 type (
 	policyName  string
@@ -48,7 +63,7 @@ func (r *policyRepository) FindByName(ctx context.Context, name string) (*polici
 	defer r.mtx.RUnlock()
 	policy, ok := r.policies[policyName(name)]
 	if !ok {
-		return nil, policies.NewErrNotFound("policy resource not found")
+		return nil, newErrPolicyNotFound("policy resource not found")
 	}
 	return policy, nil
 }

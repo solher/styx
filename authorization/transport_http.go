@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	"github.com/solher/styx/helpers"
-	"github.com/solher/styx/sessions"
 	"golang.org/x/net/context"
 
 	"github.com/go-kit/kit/log"
@@ -128,25 +127,27 @@ func EncodeHTTPRedirectResponse(ctx context.Context, w http.ResponseWriter, resp
 	return nil
 }
 
+type (
+	errDeniedAccessType interface {
+		error
+		IsDeniedAccess()
+	}
+	errDeniedAccessBehavior struct{}
+)
+
+func (err errDeniedAccessBehavior) IsDeniedAccess() {}
+
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
 	var apiError helpers.APIError
 	switch errors.Cause(err).(type) {
-	case ErrDeniedAccess:
+	case errDeniedAccessType:
 		apiError = helpers.APIUnauthorized
 	default:
 		return err
 	}
 	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
-
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)
-	return json.NewEncoder(w).Encode(apiError)
-}
-
-func encodeSession(w http.ResponseWriter, session *sessions.Session) error {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if err := json.NewEncoder(w).Encode(session); err != nil {
-		return errors.Wrap(err, "session encoding failed")
-	}
+	json.NewEncoder(w).Encode(apiError)
 	return nil
 }

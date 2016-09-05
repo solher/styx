@@ -1,11 +1,9 @@
 package helpers
 
-type BasicError struct {
-	msg string
+type ErrBehavior struct {
+	Msg string
 }
 
-func (err BasicError) Error() string {
-	return err.msg
+func (err ErrBehavior) Error() string {
+	return err.Msg
 }
-
-func NewBasicError(msg string) BasicError { return BasicError{msg: msg} }

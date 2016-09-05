@@ -1,10 +1,6 @@
 package policies
 
-import (
-	"context"
-
-	"github.com/solher/styx/helpers"
-)
+import "context"
 
 // Policy represents a set of permissions, assignable to a session.
 type Policy struct {
@@ -31,12 +27,4 @@ type Permission struct {
 // Repository provides access to a policy store.
 type Repository interface {
 	FindByName(ctx context.Context, name string) (*Policy, error)
-}
-
-// ErrNotFound is used when a policy could not be found.
-type ErrNotFound struct{ helpers.BasicError }
-
-// NewErrNotFound returns a new instance of ErrNotFound.
-func NewErrNotFound(msg string) ErrNotFound {
-	return ErrNotFound{BasicError: helpers.NewBasicError(msg)}
 }

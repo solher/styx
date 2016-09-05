@@ -8,19 +8,18 @@ import (
 	"github.com/solher/styx/sessions"
 )
 
-// ErrValidation is returned when the parameters validation failed.
-type ErrValidation struct {
-	helpers.BasicError
-	Field, Reason string
+type errValidation struct {
+	helpers.ErrBehavior
+	errValidationBehavior
 }
 
-// NewErrValidation returns a new instance of ErrValidation.
-func NewErrValidation(msg, field, reason string) ErrValidation {
-	return ErrValidation{
-		BasicError: helpers.NewBasicError(msg),
-		Field:      field,
-		Reason:     reason,
-	}
+func newErrValidation(msg, field, reason string) (err errValidation) {
+	defer func() {
+		err.Msg = msg
+		err.field = field
+		err.reason = reason
+	}()
+	return errValidation{}
 }
 
 // Service represents the account service interface.
@@ -45,7 +44,7 @@ func NewService(sessionRepo sessions.Repository) Service {
 // CreateSession creates a new session.
 func (s *service) CreateSession(ctx context.Context, session *sessions.Session) (*sessions.Session, error) {
 	if session.Policies == nil {
-		return nil, errors.Wrap(NewErrValidation("session policies cannot be blank", "policies", "blank"), "validation failed")
+		return nil, errors.Wrap(newErrValidation("session policies cannot be blank", "policies", "blank"), "validation failed")
 	}
 	return s.sessionRepo.Create(ctx, session)
 }

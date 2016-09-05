@@ -1,10 +1,6 @@
 package resources
 
-import (
-	"context"
-
-	"github.com/solher/styx/helpers"
-)
+import "context"
 
 // Resource represents a host defined by his hostname.
 type Resource struct {
@@ -21,12 +17,4 @@ type Resource struct {
 // Repository provides access to a resource store.
 type Repository interface {
 	FindByHostname(ctx context.Context, hostname string) (*Resource, error)
-}
-
-// ErrNotFound is used when a resource could not be found.
-type ErrNotFound struct{ helpers.BasicError }
-
-// NewErrNotFound returns a new instance of ErrNotFound.
-func NewErrNotFound(msg string) ErrNotFound {
-	return ErrNotFound{BasicError: helpers.NewBasicError(msg)}
 }

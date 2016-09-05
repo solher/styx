@@ -8,8 +8,45 @@ import (
 
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/pkg/errors"
+	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/sessions"
 )
+
+type errNotFoundBehavior struct{}
+
+func (err errNotFoundBehavior) IsErrNotFound() {}
+
+type errValidationBehavior struct {
+	field, reason string
+}
+
+func (err errValidationBehavior) IsErrValidation() {}
+func (err errValidationBehavior) Field() string    { return err.field }
+func (err errValidationBehavior) Reason() string   { return err.reason }
+
+type errTokenUniqueness struct {
+	helpers.ErrBehavior
+	errValidationBehavior
+}
+
+func newErrTokenUniqueness(msg string) (err errTokenUniqueness) {
+	defer func() {
+		err.Msg = msg
+		err.field = "token"
+		err.reason = "unique"
+	}()
+	return errTokenUniqueness{}
+}
+
+type errSessionNotFound struct {
+	helpers.ErrBehavior
+	errNotFoundBehavior
+}
+
+func newErrSessionNotFound(msg string) (err errSessionNotFound) {
+	defer func() { err.Msg = msg }()
+	return errSessionNotFound{}
+}
 
 type sessionRepository struct {
 	pool *redigo.Pool
@@ -22,7 +59,7 @@ type sessionRepository struct {
 func NewSessionRepository(pool *redigo.Pool) sessions.Repository {
 	return &sessionRepository{
 		pool:                   pool,
-		defaultTokenLength:     32,
+		defaultTokenLength:     64,
 		defaultSessionValidity: 24 * time.Hour,
 	}
 }
@@ -50,13 +87,23 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 
 	now := time.Now().UTC()
 	session.Created = &now
-	if session.Token == "" {
-		session.Token = genToken(r.defaultTokenLength)
-	}
 	if session.ValidTo == nil {
 		expirationTime := now.Add(r.defaultSessionValidity)
 		session.ValidTo = &expirationTime
 	}
+	if session.Token == "" {
+		session.Token = genToken(r.defaultTokenLength)
+	}
+
+	// We test the uniqueness of the token
+	exists, err := redigo.Bool(conn.Do("EXISTS", sessionKey(session.Token)))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not test the token uniqueness")
+	}
+	if exists {
+		return nil, errors.Wrap(newErrTokenUniqueness("the session token must be unique"), "validation failed")
+	}
+
 	data, err := json.Marshal(session)
 	if err != nil {
 		return nil, errors.Wrap(err, "new session marshalling failed")
@@ -68,7 +115,7 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 	ownerSessionsKey := ownerSessionsKey(session.OwnerToken)
 	_, err = conn.Do("SET", sessionKey, string(data), "EX", expiration, "NX")
 	if err != nil {
-		return nil, errors.Wrap(err, "could not set a new session")
+		return nil, errors.Wrap(errors.New(""), "could not set a new session")
 	}
 	_, err = conn.Do("HSETNX", ownerSessionsKey, sessionKey, "")
 	if err != nil {
@@ -172,7 +219,7 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 func getSession(conn redigo.Conn, key string) (*sessions.Session, error) {
 	val, err := redigo.Bytes(conn.Do("GET", key))
 	if err != nil {
-		return nil, errors.Wrap(sessions.NewErrNotFound(err.Error()), "could not get a session by key")
+		return nil, errors.Wrap(newErrSessionNotFound(err.Error()), "could not get a session by key")
 	}
 	session := &sessions.Session{}
 	if err := json.Unmarshal(val, session); err != nil {

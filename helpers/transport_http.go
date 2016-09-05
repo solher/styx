@@ -10,6 +10,30 @@ import (
 	"github.com/pkg/errors"
 )
 
+type (
+	errBodyDecodingType interface {
+		error
+		IsErrBodyDecoding()
+	}
+	ErrBodyDecodingBehavior struct{}
+)
+
+func (err ErrBodyDecodingBehavior) IsErrBodyDecoding() {}
+
+type (
+	errQueryParamType interface {
+		error
+		IsErrQueryParam()
+		Key() string
+	}
+	ErrQueryParamBehavior struct {
+		ParamKey string
+	}
+)
+
+func (err ErrQueryParamBehavior) IsErrQueryParam() {}
+func (err ErrQueryParamBehavior) Key() string      { return err.ParamKey }
+
 func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
 	var apiError APIError
 	switch e1 := err.(type) {
@@ -18,11 +42,11 @@ func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter
 		switch e1.Domain {
 		case httptransport.DomainDecode:
 			switch e2 := errors.Cause(err).(type) {
-			case ErrBodyDecoding:
+			case errBodyDecodingType:
 				apiError = APIBodyDecoding
-			case ErrQueryParam:
+			case errQueryParamType:
 				apiError = APIQueryParam
-				apiError.Params["key"] = e2.Key
+				apiError.Params["key"] = e2.Key()
 			default:
 				apiError = APIInternal
 				TraceError(ctx, err)
@@ -101,25 +125,3 @@ var (
 		Params:      make(map[string]interface{}),
 	}
 )
-
-// ErrBodyDecoding is returned when body decoding failed.
-type ErrBodyDecoding struct{ BasicError }
-
-// NewErrBodyDecoding returns a new instance of ErrBodyDecoding.
-func NewErrBodyDecoding(msg string) ErrBodyDecoding {
-	return ErrBodyDecoding{BasicError: NewBasicError(msg)}
-}
-
-// ErrQueryParam is returned when query parameters are missing.
-type ErrQueryParam struct {
-	BasicError
-	Key string
-}
-
-// NewErrQueryParam returns a new instance of ErrQueryParam.
-func NewErrQueryParam(msg, key string) ErrQueryParam {
-	return ErrQueryParam{
-		BasicError: NewBasicError(msg),
-		Key:        key,
-	}
-}
