@@ -19,7 +19,7 @@ import (
 // on predefined paths.
 func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) http.Handler {
 	options := []httptransport.ServerOption{
-		httptransport.ServerErrorEncoder(transportErrorEncoder),
+		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
 	}
 
@@ -68,7 +68,7 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 func DecodeHTTPCreateSessionRequest(_ context.Context, r *http.Request) (interface{}, error) {
 	session := &sessions.Session{}
 	if err := json.NewDecoder(r.Body).Decode(session); err != nil {
-		return nil, errors.Wrap(err, "could not decode the session")
+		return nil, errors.Wrap(helpers.NewErrBodyDecoding(err.Error()), "could not decode the session")
 	}
 	return createSessionRequest{
 		Session: session,
@@ -139,8 +139,12 @@ func EncodeHTTPDeleteSessionByTokenResponse(ctx context.Context, w http.Response
 // DecodeHTTPDeleteSessionsByOwnerTokenRequest is a transport/http.DecodeRequestFunc that decodes the
 // JSON-encoded request from the HTTP request body.
 func DecodeHTTPDeleteSessionsByOwnerTokenRequest(ctx context.Context, r *http.Request) (interface{}, error) {
+	ownerToken := r.URL.Query().Get("ownerToken")
+	if ownerToken == "" {
+		return nil, errors.Wrap(helpers.NewErrQueryParam("parameter is required", "ownerToken"), "decoding failed")
+	}
 	return deleteSessionsByOwnerTokenRequest{
-		OwnerToken: r.URL.Query().Get("ownerToken"),
+		OwnerToken: ownerToken,
 	}, nil
 }
 
@@ -157,25 +161,6 @@ func EncodeHTTPDeleteSessionsByOwnerTokenResponse(ctx context.Context, w http.Re
 	defer helpers.TraceStatusAndFinish(ctx, 200)
 	w.WriteHeader(200)
 	return nil
-}
-
-func transportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
-	apiError := helpers.APIInternal
-	if e, ok := err.(httptransport.Error); ok {
-		switch e.Domain {
-		case httptransport.DomainDecode:
-			apiError = helpers.APIBodyDecoding
-		case httptransport.DomainDo:
-			apiError = helpers.APIUnavailable
-		}
-		err = e.Err
-	}
-	helpers.TraceError(ctx, err)
-	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(apiError.Status)
-	json.NewEncoder(w).Encode(apiError)
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {

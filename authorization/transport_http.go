@@ -21,7 +21,7 @@ import (
 // on predefined paths.
 func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) http.Handler {
 	options := []httptransport.ServerOption{
-		httptransport.ServerErrorEncoder(transportErrorEncoder),
+		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
 	}
 
@@ -126,25 +126,6 @@ func EncodeHTTPRedirectResponse(ctx context.Context, w http.ResponseWriter, resp
 	defer helpers.TraceStatusAndFinish(ctx, 307)
 	w.WriteHeader(307)
 	return nil
-}
-
-func transportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
-	apiError := helpers.APIInternal
-	if e, ok := err.(httptransport.Error); ok {
-		switch e.Domain {
-		case httptransport.DomainDecode:
-			apiError = helpers.APIBodyDecoding
-		case httptransport.DomainDo:
-			apiError = helpers.APIUnavailable
-		}
-		err = e.Err
-	}
-	helpers.TraceError(ctx, err)
-	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(apiError.Status)
-	json.NewEncoder(w).Encode(apiError)
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {

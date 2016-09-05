@@ -1,5 +1,51 @@
 package helpers
 
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"golang.org/x/net/context"
+
+	httptransport "github.com/go-kit/kit/transport/http"
+	"github.com/pkg/errors"
+)
+
+func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
+	var apiError APIError
+	switch e1 := err.(type) {
+	case httptransport.Error:
+		err = e1.Err
+		switch e1.Domain {
+		case httptransport.DomainDecode:
+			switch e2 := errors.Cause(err).(type) {
+			case ErrBodyDecoding:
+				apiError = APIBodyDecoding
+			case ErrQueryParam:
+				apiError = APIQueryParam
+				apiError.Params["key"] = e2.Key
+			default:
+				apiError = APIInternal
+				TraceError(ctx, err)
+			}
+		case httptransport.DomainDo:
+			apiError = APIUnavailable
+			TraceError(ctx, err)
+		default:
+			apiError = APIInternal
+			TraceError(ctx, err)
+		}
+	default:
+		apiError = APIInternal
+		TraceError(ctx, err)
+	}
+	defer TraceAPIErrorAndFinish(ctx, apiError)
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(apiError.Status)
+	json.NewEncoder(w).Encode(apiError)
+}
+
 // APIError defines a standard format for API errors.
 type APIError struct {
 	// The status code.
@@ -17,30 +63,69 @@ var (
 		Status:      500,
 		Description: "An internal error occured. Please retry later.",
 		ErrorCode:   "INTERNAL_ERROR",
+		Params:      make(map[string]interface{}),
 	}
 	APIUnavailable = APIError{
 		Status:      503,
 		Description: "The service is currently unavailable. Please retry later.",
 		ErrorCode:   "SERVICE_UNAVAILABLE",
+		Params:      make(map[string]interface{}),
 	}
 	APIBodyDecoding = APIError{
 		Status:      400,
 		Description: "Could not decode the JSON request.",
 		ErrorCode:   "BODY_DECODING_ERROR",
+		Params:      make(map[string]interface{}),
+	}
+	APIQueryParam = APIError{
+		Status:      400,
+		Description: "Missing query parameter.",
+		ErrorCode:   "QUERY_PARAM_ERROR",
+		Params:      make(map[string]interface{}),
+	}
+	APIValidation = APIError{
+		Status:      400,
+		Description: "The parameters validation failed.",
+		ErrorCode:   "VALIDATION_ERROR",
+		Params:      make(map[string]interface{}),
 	}
 	APIUnauthorized = APIError{
 		Status:      401,
 		Description: "Authorization Required.",
 		ErrorCode:   "AUTHORIZATION_REQUIRED",
+		Params:      make(map[string]interface{}),
 	}
 	APIForbidden = APIError{
 		Status:      403,
 		Description: "The specified resource was not found or you don't have sufficient permissions.",
 		ErrorCode:   "FORBIDDEN",
-	}
-	APIValidation = APIError{
-		Status:      422,
-		Description: "The parameter validation failed.",
-		ErrorCode:   "VALIDATION_ERROR",
+		Params:      make(map[string]interface{}),
 	}
 )
+
+// ErrBodyDecoding is returned when body decoding failed.
+type ErrBodyDecoding struct{ BasicError }
+
+// NewErrBodyDecoding returns a new instance of ErrBodyDecoding.
+func NewErrBodyDecoding(msg string) ErrBodyDecoding {
+	return ErrBodyDecoding{BasicError: NewBasicError(msg)}
+}
+
+// ErrQueryParam is returned when query parameters are missing.
+type ErrQueryParam struct {
+	BasicError
+	Key string
+}
+
+// Error encodes the error as a string.
+func (err ErrQueryParam) Error() string {
+	return fmt.Sprintf("msg: %s, key: %s", err.msg, err.Key)
+}
+
+// NewErrQueryParam returns a new instance of ErrQueryParam.
+func NewErrQueryParam(msg, key string) ErrQueryParam {
+	return ErrQueryParam{
+		BasicError: NewBasicError(msg),
+		Key:        key,
+	}
+}
