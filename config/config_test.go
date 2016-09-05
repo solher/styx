@@ -1,9 +1,11 @@
 package config_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/solher/styx/config"
 	"github.com/solher/styx/policies"
 	"github.com/solher/styx/resources"
@@ -67,24 +69,55 @@ func TestFromFile(t *testing.T) {
 
 		file string // Input file
 
-		config *config.Config // Expected result
-		err    bool           // Expected error presence
+		config        *config.Config // Expected result
+		errorExpected bool           // Expected error presence
+		err           error          // Expected error (ignored if errorExpected == true and error == nil)
 	}{
-		{name: "empty file", file: emptyFile, config: emptyConfig, err: false},
-		{name: "example file", file: exampleFile, config: exampleConfig, err: false},
+		{
+			name:   "empty file",
+			file:   emptyFile,
+			config: emptyConfig, errorExpected: false,
+		},
+		{
+			name:   "example file",
+			file:   exampleFile,
+			config: exampleConfig, errorExpected: false,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := config.FromFile([]byte(tc.file))
 
-			if (err != nil) != tc.err {
-				t.Errorf(`expected err presence to be %v, got "%s"`, tc.err, err)
+			if tc.errorExpected && tc.err != nil && tc.err != errors.Cause(err) {
+				t.Errorf(`expected err to be "%v", got "%s"`, format(tc.err), format(err))
+			} else if tc.errorExpected != (err != nil) {
+				t.Errorf(`expected err presence to be "%v", got "%s"`, format(tc.errorExpected), format(err))
 			}
 			if !reflect.DeepEqual(config, tc.config) {
-				t.Errorf(`expected config to be %v, got %v`, tc.config, config)
+				t.Errorf(`expected config to be "%v", got "%v"`, format(tc.config), format(config))
 			}
 		})
+	}
+}
+
+func format(v interface{}) string {
+	if v == nil {
+		return "nil"
+	}
+	val := reflect.ValueOf(v)
+	switch val.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Array, reflect.Slice:
+		if val.IsNil() {
+			return "nil"
+		}
+	}
+	switch t := v.(type) {
+	case error:
+		return t.Error()
+	default:
+		m, _ := json.Marshal(v)
+		return string(m)
 	}
 }
 
