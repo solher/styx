@@ -139,12 +139,12 @@ func EncodeHTTPDeleteSessionByTokenResponse(ctx context.Context, w http.Response
 // DecodeHTTPDeleteSessionsByOwnerTokenRequest is a transport/http.DecodeRequestFunc that decodes the
 // JSON-encoded request from the HTTP request body.
 func DecodeHTTPDeleteSessionsByOwnerTokenRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	ownerToken := r.URL.Query().Get("ownerToken")
-	if ownerToken == "" {
-		return nil, errors.Wrap(helpers.NewErrQueryParam("parameter is required", "ownerToken"), "decoding failed")
+	values, ok := r.URL.Query()["ownerToken"]
+	if !ok {
+		return nil, errors.Wrap(helpers.NewErrQueryParam("ownerToken parameter is required", "ownerToken"), "decoding failed")
 	}
 	return deleteSessionsByOwnerTokenRequest{
-		OwnerToken: ownerToken,
+		OwnerToken: values[0],
 	}, nil
 }
 
@@ -165,7 +165,11 @@ func EncodeHTTPDeleteSessionsByOwnerTokenResponse(ctx context.Context, w http.Re
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
 	var apiError helpers.APIError
-	switch errors.Cause(err).(type) {
+	switch err := errors.Cause(err).(type) {
+	case ErrValidation:
+		apiError = helpers.APIValidation
+		apiError.Params["field"] = err.Field
+		apiError.Params["reason"] = err.Reason
 	case sessions.ErrNotFound:
 		apiError = helpers.APIForbidden
 	default:

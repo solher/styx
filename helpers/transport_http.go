@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"golang.org/x/net/context"
@@ -115,11 +114,6 @@ func NewErrBodyDecoding(msg string) ErrBodyDecoding {
 type ErrQueryParam struct {
 	BasicError
 	Key string
-}
-
-// Error encodes the error as a string.
-func (err ErrQueryParam) Error() string {
-	return fmt.Sprintf("msg: %s, key: %s", err.msg, err.Key)
 }
 
 // NewErrQueryParam returns a new instance of ErrQueryParam.
