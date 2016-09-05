@@ -9,8 +9,6 @@ import (
 	"github.com/solher/styx/resources"
 )
 
-func boolCpy(b bool) *bool { return &b }
-
 var (
 	emptyFile   = ``
 	emptyConfig = &config.Config{}
@@ -65,8 +63,10 @@ policies:
 // TestFromFile runs tests on the FromFile function.
 func TestFromFile(t *testing.T) {
 	var testCases = []struct {
-		name   string         // Test case name
-		file   string         // Input file
+		name string // Test case name
+
+		file string // Input file
+
 		config *config.Config // Expected result
 		err    bool           // Expected error presence
 	}{
@@ -87,3 +87,5 @@ func TestFromFile(t *testing.T) {
 		})
 	}
 }
+
+func boolCpy(b bool) *bool { return &b }

@@ -20,14 +20,25 @@ type Service interface {
 	Redirect(ctx context.Context, hostname string) (string, error)
 }
 
-type service struct {
-	policyRepo   policies.Repository
-	resourceRepo resources.Repository
-	sessionRepo  sessions.Repository
-}
+type (
+	policyReader interface {
+		FindByName(ctx context.Context, name string) (*policies.Policy, error)
+	}
+	resourceReader interface {
+		FindByHostname(ctx context.Context, hostname string) (*resources.Resource, error)
+	}
+	sessionReader interface {
+		FindByToken(ctx context.Context, token string) (*sessions.Session, error)
+	}
+	service struct {
+		policyRepo   policyReader
+		resourceRepo resourceReader
+		sessionRepo  sessionReader
+	}
+)
 
 // NewService returns a new instance of the authorization service.
-func NewService(policyRepo policies.Repository, resourceRepo resources.Repository, sessionRepo sessions.Repository) Service {
+func NewService(policyRepo policyReader, resourceRepo resourceReader, sessionRepo sessionReader) Service {
 	return &service{
 		policyRepo:   policyRepo,
 		resourceRepo: resourceRepo,
