@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/solher/styx/config"
 	"github.com/solher/styx/policies"
 	"github.com/solher/styx/resources"
@@ -71,7 +70,6 @@ func TestFromFile(t *testing.T) {
 
 		config        *config.Config // Expected result
 		errorExpected bool           // Expected error presence
-		err           error          // Expected error (ignored if errorExpected == true and error == nil)
 	}{
 		{
 			name:   "empty file",
@@ -89,9 +87,7 @@ func TestFromFile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := config.FromFile([]byte(tc.file))
 
-			if tc.errorExpected && tc.err != nil && tc.err != errors.Cause(err) {
-				t.Errorf(`expected err to be "%v", got "%s"`, format(tc.err), format(err))
-			} else if tc.errorExpected != (err != nil) {
+			if tc.errorExpected != (err != nil) {
 				t.Errorf(`expected err presence to be "%v", got "%s"`, format(tc.errorExpected), format(err))
 			}
 			if !reflect.DeepEqual(config, tc.config) {

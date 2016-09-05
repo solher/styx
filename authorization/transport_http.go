@@ -149,7 +149,7 @@ func transportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
 	var apiError helpers.APIError
-	switch errors.Cause(err) {
+	switch errors.Cause(err).(type) {
 	case ErrDeniedAccess:
 		apiError = helpers.APIUnauthorized
 	default:

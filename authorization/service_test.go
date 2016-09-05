@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/solher/styx/authorization"
 	"github.com/solher/styx/policies"
 	"github.com/solher/styx/resources"
@@ -125,7 +124,7 @@ func TestAuthorizeToken(t *testing.T) {
 			policyRepoFindByNamePolicy: simpleGrantPolicy, policyRepoFindByNameError: nil,
 			resourceRepoFindByHostnameResource: simpleResource, resourceRepoFindByHostnameError: nil,
 			sessionRepoFindByTokenSession: emptyPoliciesSession, sessionRepoFindByTokenError: nil,
-			session: nil, errorExpected: true, err: authorization.ErrDeniedAccess,
+			session: nil, errorExpected: true,
 		},
 		{
 			name:     "no permissions in policy",
@@ -136,7 +135,7 @@ func TestAuthorizeToken(t *testing.T) {
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      onePolicySession,
 			sessionRepoFindByTokenError:        nil,
-			session:                            nil, errorExpected: true, err: authorization.ErrDeniedAccess,
+			session:                            nil, errorExpected: true,
 		},
 		{
 			name:     "simple grant",
@@ -158,7 +157,7 @@ func TestAuthorizeToken(t *testing.T) {
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      onePolicySession,
 			sessionRepoFindByTokenError:        nil,
-			session:                            nil, errorExpected: true, err: authorization.ErrDeniedAccess,
+			session:                            nil, errorExpected: true,
 		},
 		{
 			name:     "path granted because of public resource",
@@ -180,7 +179,7 @@ func TestAuthorizeToken(t *testing.T) {
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      onePolicySession,
 			sessionRepoFindByTokenError:        nil,
-			session:                            nil, errorExpected: true, err: authorization.ErrDeniedAccess,
+			session:                            nil, errorExpected: true,
 		},
 		{
 			name:     "trailing slash escaped",
@@ -197,12 +196,12 @@ func TestAuthorizeToken(t *testing.T) {
 			name:     "guest policy does not exists",
 			hostname: simpleResource.Hostname, path: "", token: "F00bAr",
 			policyRepoFindByNamePolicy:         nil,
-			policyRepoFindByNameError:          policies.ErrNotFound,
+			policyRepoFindByNameError:          policies.NewErrNotFound("policy not found"),
 			resourceRepoFindByHostnameResource: simpleResource,
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      nil,
-			sessionRepoFindByTokenError:        sessions.ErrNotFound,
-			session:                            nil, errorExpected: true, err: authorization.ErrDeniedAccess,
+			sessionRepoFindByTokenError:        sessions.NewErrNotFound("session not found"),
+			session:                            nil, errorExpected: true,
 		},
 		{
 			name:     "guest policy grant",
@@ -212,7 +211,7 @@ func TestAuthorizeToken(t *testing.T) {
 			resourceRepoFindByHostnameResource: simpleResource,
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      nil,
-			sessionRepoFindByTokenError:        sessions.ErrNotFound,
+			sessionRepoFindByTokenError:        sessions.NewErrNotFound("session not found"),
 			session:                            nil, errorExpected: false,
 		},
 	}
@@ -227,9 +226,7 @@ func TestAuthorizeToken(t *testing.T) {
 			sessionRepo.findByTokenSession, sessionRepo.findByTokenError = tc.sessionRepoFindByTokenSession, tc.sessionRepoFindByTokenError
 			session, err := service.AuthorizeToken(ctx, tc.hostname, tc.path, tc.token)
 
-			if tc.errorExpected && tc.err != nil && tc.err != errors.Cause(err) {
-				t.Errorf(`expected err to be "%v", got "%s"`, format(tc.err), format(err))
-			} else if tc.errorExpected != (err != nil) {
+			if tc.errorExpected != (err != nil) {
 				t.Errorf(`expected err presence to be "%v", got "%s"`, format(tc.errorExpected), format(err))
 			}
 			if !reflect.DeepEqual(session, tc.session) {

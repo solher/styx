@@ -4,13 +4,19 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
+	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/policies"
 	"github.com/solher/styx/resources"
 	"gopkg.in/yaml.v2"
 )
 
 // ErrValidation indicates that configuration file validation failed.
-var ErrValidation = errors.New("validation error")
+type ErrValidation struct{ helpers.BasicError }
+
+// NewErrValidation returns a new instance of ErrValidation.
+func NewErrValidation(msg string) ErrValidation {
+	return ErrValidation{BasicError: helpers.NewBasicError(msg)}
+}
 
 // Config represents a parsed configuration file.
 type Config struct {
@@ -59,16 +65,16 @@ func FromFile(file []byte) (*Config, error) {
 func validateResource(names, hostnames map[string]struct{}) func(resource *resources.Resource) error {
 	return func(resource *resources.Resource) error {
 		if len(resource.Name) == 0 {
-			return errors.Wrap(ErrValidation, "resource name cannot be blank")
+			return errors.Wrap(NewErrValidation("resource name cannot be blank"), "invalid resource")
 		}
 		if len(resource.Hostname) == 0 {
-			return errors.Wrapf(ErrValidation, `resource '%s' hostname cannot be blank`, resource.Name)
+			return errors.Wrap(NewErrValidation(`resource '`+resource.Name+`' hostname cannot be blank`), "invalid resource")
 		}
 		if _, exists := names[resource.Name]; exists {
-			return errors.Wrapf(ErrValidation, `resource '%s' name must be unique`, resource.Name)
+			return errors.Wrap(NewErrValidation(`resource '`+resource.Name+`' name must be unique`), "invalid resource")
 		}
 		if _, exists := hostnames[resource.Hostname]; exists {
-			return errors.Wrapf(ErrValidation, `resource '%s' hostname must be unique`, resource.Name)
+			return errors.Wrap(NewErrValidation(`resource '`+resource.Name+`' hostname must be unique`), "invalid resource")
 		}
 		return nil
 	}
@@ -77,23 +83,23 @@ func validateResource(names, hostnames map[string]struct{}) func(resource *resou
 func validatePolicy(names, resourceNames map[string]struct{}) func(policy *policies.Policy) error {
 	return func(policy *policies.Policy) error {
 		if len(policy.Name) == 0 {
-			return errors.Wrap(ErrValidation, "policy name cannot be blank")
+			return errors.Wrap(NewErrValidation("policy name cannot be blank"), "invalid policy")
 		}
 		if policy.Permissions == nil || len(policy.Permissions) == 0 {
-			return errors.Wrapf(ErrValidation, `policy '%s' permissions cannot be blank`, policy.Name)
+			return errors.Wrap(NewErrValidation(`policy '`+policy.Name+`' permissions cannot be blank`), "invalid policy")
 		}
 		if _, exists := names[policy.Name]; exists {
-			return errors.Wrapf(ErrValidation, `policy '%s' name must be unique`, policy.Name)
+			return errors.Wrap(NewErrValidation(`policy '`+policy.Name+`' name must be unique`), "invalid policy")
 		}
 		for _, permission := range policy.Permissions {
 			if len(permission.Resource) == 0 {
-				return errors.Wrapf(ErrValidation, `policy '%s': resource cannot be blank`, policy.Name)
+				return errors.Wrap(NewErrValidation(`policy '`+policy.Name+`': resource cannot be blank`), "invalid policy")
 			}
 			if permission.Resource == "*" {
 				continue
 			}
 			if _, exists := resourceNames[permission.Resource]; !exists {
-				return errors.Wrapf(ErrValidation, `policy '%s': resource '%s' does not exists`, policy.Name, permission.Resource)
+				return errors.Wrap(NewErrValidation(`policy '`+policy.Name+`': resource '`+permission.Resource+`' does not exists`), "invalid policy")
 			}
 		}
 		return nil

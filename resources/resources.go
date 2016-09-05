@@ -3,7 +3,7 @@ package resources
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	"github.com/solher/styx/helpers"
 )
 
 // Resource represents a host defined by his hostname.
@@ -18,10 +18,15 @@ type Resource struct {
 	RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl"`
 }
 
-// ErrNotFound is used when a resource could not be found.
-var ErrNotFound = errors.New("resource resource not found")
-
 // Repository provides access to a resource store.
 type Repository interface {
 	FindByHostname(ctx context.Context, hostname string) (*Resource, error)
+}
+
+// ErrNotFound is used when a resource could not be found.
+type ErrNotFound struct{ helpers.BasicError }
+
+// NewErrNotFound returns a new instance of ErrNotFound.
+func NewErrNotFound(msg string) ErrNotFound {
+	return ErrNotFound{BasicError: helpers.NewBasicError(msg)}
 }

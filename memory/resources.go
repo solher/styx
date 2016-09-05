@@ -48,7 +48,7 @@ func (r *resourceRepository) FindByHostname(ctx context.Context, hostname string
 	defer r.mtx.RUnlock()
 	resource, ok := r.resources[resourceHostname(hostname)]
 	if !ok {
-		return nil, resources.ErrNotFound
+		return nil, resources.NewErrNotFound("resource resource not found")
 	}
 	return resource, nil
 }

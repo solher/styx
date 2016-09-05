@@ -40,7 +40,7 @@ var (
 	}
 	APIValidation = APIError{
 		Status:      422,
-		Description: "The model validation failed.",
+		Description: "The parameter validation failed.",
 		ErrorCode:   "VALIDATION_ERROR",
 	}
 )

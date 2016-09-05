@@ -172,7 +172,7 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 func getSession(conn redigo.Conn, key string) (*sessions.Session, error) {
 	val, err := redigo.Bytes(conn.Do("GET", key))
 	if err != nil {
-		return nil, errors.Wrap(sessions.ErrNotFound, err.Error())
+		return nil, errors.Wrap(sessions.NewErrNotFound(err.Error()), "could not get a session by key")
 	}
 	session := &sessions.Session{}
 	if err := json.Unmarshal(val, session); err != nil {

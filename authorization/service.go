@@ -6,13 +6,19 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/policies"
 	"github.com/solher/styx/resources"
 	"github.com/solher/styx/sessions"
 )
 
 // ErrDeniedAccess is returned when the access is denied to the user.
-var ErrDeniedAccess = errors.New("session not found, expired or unauthorized access")
+type ErrDeniedAccess struct{ helpers.BasicError }
+
+// NewErrDeniedAccess returns a new instance of ErrDeniedAccess.
+func NewErrDeniedAccess(msg string) ErrDeniedAccess {
+	return ErrDeniedAccess{BasicError: helpers.NewBasicError(msg)}
+}
 
 // Service represents the authorization service interface.
 type Service interface {
@@ -83,9 +89,9 @@ func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token stri
 	// If we can't find a resource, we deny the access
 	// Otherwise, the access is denied with an error
 	if err := <-resourceErrCh; err != nil {
-		switch errors.Cause(err) {
+		switch errors.Cause(err).(type) {
 		case resources.ErrNotFound:
-			return nil, errors.Wrap(ErrDeniedAccess, "resource not found")
+			return nil, errors.Wrap(NewErrDeniedAccess(err.Error()), "resource not found")
 		default:
 			return nil, err
 		}
@@ -98,7 +104,7 @@ func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token stri
 	// If no session is found for the token, we initiate a guest session
 	// Otherwise, the access is denied with an error
 	if err := <-sessionErrCh; err != nil {
-		switch errors.Cause(err) {
+		switch errors.Cause(err).(type) {
 		case sessions.ErrNotFound:
 			return s.authorizeGuestSession(ctx, path, resource.Name)
 		default:
@@ -130,18 +136,18 @@ func (s *service) authorizeSession(ctx context.Context, path, resource string, s
 			return session, nil
 		}
 	}
-	return nil, errors.Wrap(ErrDeniedAccess, "access denied")
+	return nil, errors.Wrap(NewErrDeniedAccess("access denied"), "every checked policies returned errors")
 }
 
 func (s *service) authorizeGuestSession(ctx context.Context, path, resource string) (*sessions.Session, error) {
 	// First, we find the guest policy
 	policy, err := s.policyRepo.FindByName(ctx, "guest")
 	if err != nil {
-		return nil, errors.Wrap(ErrDeniedAccess, err.Error())
+		return nil, errors.Wrap(NewErrDeniedAccess(err.Error()), "could not find the guest policy")
 	}
 	// We check the guest permissions
 	if err := s.checkPermissions(policy, path, resource, "guest"); err != nil {
-		return nil, errors.Wrap(ErrDeniedAccess, "access denied to guest session")
+		return nil, errors.Wrap(NewErrDeniedAccess(err.Error()), "access denied to guest session")
 	}
 	return nil, nil
 }

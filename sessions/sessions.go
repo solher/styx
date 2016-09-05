@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/solher/styx/helpers"
 )
 
 // Session associates a unique token, an abstract/custom user payload
@@ -28,13 +28,18 @@ type Session struct {
 	Payload []byte `json:"payload,omitempty"`
 }
 
-// ErrNotFound is used when a session could not be found.
-var ErrNotFound = errors.New("session resource not found")
-
 // Repository provides access to a session store.
 type Repository interface {
 	Create(ctx context.Context, session *Session) (*Session, error)
 	FindByToken(ctx context.Context, token string) (*Session, error)
 	DeleteByToken(ctx context.Context, token string) (*Session, error)
 	DeleteByOwnerToken(ctx context.Context, ownerToken string) ([]Session, error)
+}
+
+// ErrNotFound is used when a session could not be found.
+type ErrNotFound struct{ helpers.BasicError }
+
+// NewErrNotFound returns a new instance of ErrNotFound.
+func NewErrNotFound(msg string) ErrNotFound {
+	return ErrNotFound{BasicError: helpers.NewBasicError(msg)}
 }

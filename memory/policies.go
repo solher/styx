@@ -48,7 +48,7 @@ func (r *policyRepository) FindByName(ctx context.Context, name string) (*polici
 	defer r.mtx.RUnlock()
 	policy, ok := r.policies[policyName(name)]
 	if !ok {
-		return nil, policies.ErrNotFound
+		return nil, policies.NewErrNotFound("policy resource not found")
 	}
 	return policy, nil
 }

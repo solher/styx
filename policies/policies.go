@@ -3,7 +3,7 @@ package policies
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	"github.com/solher/styx/helpers"
 )
 
 // Policy represents a set of permissions, assignable to a session.
@@ -28,10 +28,15 @@ type Permission struct {
 	Deny *bool `json:"deny,omitempty" yaml:"deny"`
 }
 
-// ErrNotFound is used when a policy could not be found.
-var ErrNotFound = errors.New("policy resource not found")
-
 // Repository provides access to a policy store.
 type Repository interface {
 	FindByName(ctx context.Context, name string) (*Policy, error)
+}
+
+// ErrNotFound is used when a policy could not be found.
+type ErrNotFound struct{ helpers.BasicError }
+
+// NewErrNotFound returns a new instance of ErrNotFound.
+func NewErrNotFound(msg string) ErrNotFound {
+	return ErrNotFound{BasicError: helpers.NewBasicError(msg)}
 }
