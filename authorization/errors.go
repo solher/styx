@@ -1,9 +1,15 @@
 package authorization
 
-type errDeniedAccess interface {
-	error
-	IsDeniedAccess()
-}
+type (
+	errNotFound interface {
+		error
+		IsErrNotFound()
+	}
+	errDeniedAccess interface {
+		error
+		IsDeniedAccess()
+	}
+)
 
 type errDeniedAccessBehavior struct{}
 
@@ -17,9 +23,4 @@ func withErrDeniedAccess(err error) error {
 		err,
 		errDeniedAccessBehavior{},
 	}
-}
-
-func isErrDeniedAccess(err error) bool {
-	_, ok := err.(errDeniedAccess)
-	return ok
 }

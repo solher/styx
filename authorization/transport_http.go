@@ -128,12 +128,12 @@ func EncodeHTTPRedirectResponse(ctx context.Context, w http.ResponseWriter, resp
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
 	var apiError helpers.APIError
-	if isErrDeniedAccess(err) {
+	switch err.(type) {
+	case errDeniedAccess:
 		apiError = helpers.APIUnauthorized
-	} else {
+	default:
 		return err
 	}
-
 	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)

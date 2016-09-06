@@ -153,16 +153,16 @@ func EncodeHTTPDeleteSessionsByOwnerTokenResponse(ctx context.Context, w http.Re
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
 	var apiError helpers.APIError
-	if field, reason, ok := isErrValidation(err); ok {
+	switch err := err.(type) {
+	case errValidation:
 		apiError = helpers.APIValidation
-		apiError.Params["field"] = field
-		apiError.Params["reason"] = reason
-	} else if sessions.IsErrNotFound(err) {
+		apiError.Params["field"] = err.Field()
+		apiError.Params["reason"] = err.Reason()
+	case errNotFound:
 		apiError = helpers.APIForbidden
-	} else {
+	default:
 		return err
 	}
-
 	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)

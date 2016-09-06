@@ -80,11 +80,12 @@ func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token stri
 	// If we can't find a resource, we deny the access
 	// Otherwise, the access is denied with an error
 	if err := <-resourceErrCh; err != nil {
-		if resources.IsErrNotFound(err) {
+		switch err.(type) {
+		case errNotFound:
 			return nil, withErrDeniedAccess(err)
+		default:
+			return nil, err
 		}
-		return nil, err
-
 	}
 	resource := <-resourceCh
 	// If the found resource is marked as public, we allow the access without condition
@@ -94,10 +95,12 @@ func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token stri
 	// If no session is found for the token, we initiate a guest session
 	// Otherwise, the access is denied with an error
 	if err := <-sessionErrCh; err != nil {
-		if sessions.IsErrNotFound(err) {
+		switch err.(type) {
+		case errNotFound:
 			return s.authorizeGuestSession(ctx, path, resource.Name)
+		default:
+			return nil, err
 		}
-		return nil, err
 	}
 	// If a session is found, we try to authorize it
 	return s.authorizeSession(ctx, path, resource.Name, <-sessionCh)
@@ -131,10 +134,12 @@ func (s *service) authorizeGuestSession(ctx context.Context, path, resource stri
 	// First, we find the guest policy
 	policy, err := s.policyRepo.FindByName(ctx, "guest")
 	if err != nil {
-		if policies.IsErrNotFound(err) {
+		switch err.(type) {
+		case errNotFound:
 			return nil, withErrDeniedAccess(err)
+		default:
+			return nil, err
 		}
-		return nil, err
 	}
 	// We check the guest permissions
 	if err := s.checkPermissions(policy, path, resource, "guest"); err != nil {

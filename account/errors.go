@@ -1,15 +1,31 @@
 package account
 
-import "github.com/solher/styx/sessions"
-
 type (
+	errNotFound interface {
+		error
+		IsErrNotFound()
+	}
 	errValidation interface {
 		error
-		IsAccountErrValidation()
+		IsErrValidation()
 		Field() string
 		Reason() string
 	}
 )
+
+type errNotFoundBehavior struct{}
+
+func (e errNotFoundBehavior) IsErrNotFound() {}
+
+func withErrNotFound(err error) error {
+	return struct {
+		error
+		errNotFoundBehavior
+	}{
+		err,
+		errNotFoundBehavior{},
+	}
+}
 
 type errValidationBehavior struct {
 	field, reason string
@@ -30,13 +46,4 @@ func withErrValidation(err error, field, reason string) error {
 			reason: reason,
 		},
 	}
-}
-
-func isErrValidation(err error) (string, string, bool) {
-	if e, ok := err.(errValidation); ok {
-		return e.Field(), e.Reason(), true
-	} else if field, reason, ok := sessions.IsErrValidation(err); ok {
-		return field, reason, true
-	}
-	return "", "", false
 }

@@ -1,10 +1,5 @@
 package sessions
 
-type errNotFound interface {
-	error
-	IsErrNotFound()
-}
-
 type errNotFoundBehavior struct{}
 
 func (e errNotFoundBehavior) IsErrNotFound() {}
@@ -18,19 +13,6 @@ func WithErrNotFound(err error) error {
 		err,
 		errNotFoundBehavior{},
 	}
-}
-
-// IsErrNotFound returns true if err implements errNotFound.
-func IsErrNotFound(err error) bool {
-	_, ok := err.(errNotFound)
-	return ok
-}
-
-type errValidation interface {
-	error
-	IsErrValidation()
-	Field() string
-	Reason() string
 }
 
 type errValidationBehavior struct {
@@ -53,13 +35,4 @@ func WithErrValidation(err error, field, reason string) error {
 			reason: reason,
 		},
 	}
-}
-
-// IsErrValidation returns true if err implements errValidation.
-func IsErrValidation(err error) (string, string, bool) {
-	e, ok := err.(errValidation)
-	if !ok {
-		return "", "", false
-	}
-	return e.Field(), e.Reason(), true
 }
