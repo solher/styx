@@ -37,8 +37,13 @@ const (
 	defaultRedisAddr    = "redis:6379"
 	defaultRedisMaxConn = 16
 	// Business domain.
+	// Account service.
 	defaultDefaultTokenLength     = 64
 	defaultDefaultSessionValidity = 24 * time.Hour
+	// Authorization service.
+	defaultAccessTokenCookie = "access_token"
+	defaultAccessTokenHeader = "Styx-Access-Token"
+	defaultRequestURLHeader  = "Request-Url"
 	// Transport domain.
 	defaultHTTPAddr = ":3000"
 	defaultGRPCAddr = ":8082"
@@ -54,22 +59,34 @@ func main() {
 		redisAddrEnv    = envString("REDIS_ADDR", defaultRedisAddr)
 		redisMaxConnEnv = envInt("REDIS_MAX_CONN", defaultRedisMaxConn)
 		// Business domain.
+		// Account service.
 		defaultTokenLengthEnv     = envInt("DEFAULT_TOKEN_LENGTH", defaultDefaultTokenLength)
 		defaultSessionValidityEnv = envDuration("DEFAULT_SESSION_VALIDITY", defaultDefaultSessionValidity)
+		// Authorization service.
+		accessTokenCookieEnv = envString("ACCESS_TOKEN_COOKIE", defaultAccessTokenCookie)
+		accessTokenHeaderEnv = envString("ACCESS_TOKEN_HEADER", defaultAccessTokenHeader)
+		requestURLHeaderEnv  = envString("REQUEST_URL_HEADER", defaultRequestURLHeader)
 		// Transport domain.
 		httpAddrEnv = envString("HTTP_ADDR", defaultHTTPAddr)
 		grpcAddrEnv = envString("GRPC_ADDR", defaultGRPCAddr)
 		// Config watcher.
 		configFileEnv = envString("CONFIG_FILE", defaultConfigFile)
+	)
 
+	var (
 		// Tracing domain.
 		zipkinAddr = flag.String("zipkinAddr", zipkinAddrEnv, "Enable Zipkin tracing via server host:port")
 		// Database domain.
 		redisAddr    = flag.String("redisAddr", redisAddrEnv, "Redis server address")
 		redisMaxConn = flag.Int("redisMaxConn", redisMaxConnEnv, "Max simultaneous connections to Redis")
 		// Business domain.
+		// Account service.
 		defaultTokenLength     = flag.Int("defaultTokenLength", defaultTokenLengthEnv, "The default session token length")
 		defaultSessionValidity = flag.Duration("defaultSessionValidity", defaultSessionValidityEnv, "The default session validity duration")
+		// Authorization service.
+		accessTokenCookie = flag.String("accessTokenCookie", accessTokenCookieEnv, "The cookie key to get the access token from")
+		accessTokenHeader = flag.String("accessTokenHeader", accessTokenHeaderEnv, "The HTTP header to get the access token from")
+		requestURLHeader  = flag.String("requestURLHeader", requestURLHeaderEnv, "The HTTP header to get the URL requested by the user")
 		// Transport domain.
 		httpAddr = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
 		_        = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
@@ -200,7 +217,15 @@ func main() {
 	errc := make(chan error)
 
 	// Transport domain.
-	authorizationHandler := authorization.MakeHTTPHandler(ctx, authorizationEndpoints, tracer, logger)
+	authorizationHandler := authorization.MakeHTTPHandler(
+		ctx,
+		authorizationEndpoints,
+		tracer,
+		logger,
+		authorization.AccessTokenCookie(*accessTokenCookie),
+		authorization.AccessTokenHeader(*accessTokenHeader),
+		authorization.RequestURLHeader(*requestURLHeader),
+	)
 	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
 
 	r := chi.NewRouter()

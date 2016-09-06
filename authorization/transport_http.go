@@ -17,25 +17,33 @@ import (
 
 // MakeHTTPHandler returns a handler that makes a set of endpoints available
 // on predefined paths.
-func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) http.Handler {
-	options := []httptransport.ServerOption{
+func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger, opts ...HTTPHandlerOption) http.Handler {
+	transportOpts := []httptransport.ServerOption{
 		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
+	}
+	handlerOpts := &httpHandlerOptions{
+		accessTokenCookie: "access_token",
+		accessTokenHeader: "Styx-Access-Token",
+		requestURLHeader:  "Request-Url",
+	}
+	for _, opt := range opts {
+		opt(handlerOpts)
 	}
 
 	authorizeTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.AuthorizeTokenEndpoint,
-		DecodeHTTPAuthorizeTokenRequest,
+		DecodeHTTPAuthorizeTokenRequest(handlerOpts.accessTokenCookie, handlerOpts.accessTokenHeader, handlerOpts.requestURLHeader),
 		EncodeHTTPAuthorizeTokenResponse,
-		append(options, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Authorize token", logger)))...,
+		append(transportOpts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Authorize token", logger)))...,
 	)
 	redirectHandler := httptransport.NewServer(
 		ctx,
 		endpoints.RedirectEndpoint,
 		DecodeHTTPRedirectRequest,
 		EncodeHTTPRedirectResponse,
-		append(options, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Redirect URL", logger)))...,
+		append(transportOpts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Redirect URL", logger)))...,
 	)
 
 	r := chi.NewRouter()
@@ -45,29 +53,61 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 	return r
 }
 
+type httpHandlerOptions struct {
+	accessTokenCookie string
+	accessTokenHeader string
+	requestURLHeader  string
+}
+
+// HTTPHandlerOption sets an optional parameter for the HTTP handler.
+type HTTPHandlerOption func(*httpHandlerOptions)
+
+// AccessTokenCookie sets the cookie key to get the access token from.
+func AccessTokenCookie(key string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.accessTokenCookie = key
+	}
+}
+
+// AccessTokenHeader sets the header to get the access token from.
+func AccessTokenHeader(header string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.accessTokenHeader = header
+	}
+}
+
+// RequestURLHeader sets the header to get the URL requested by the user.
+func RequestURLHeader(header string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.requestURLHeader = header
+	}
+}
+
 // DecodeHTTPAuthorizeTokenRequest is a transport/http.DecodeRequestFunc that decodes the
 // JSON-encoded request from the HTTP request body.
-func DecodeHTTPAuthorizeTokenRequest(_ context.Context, r *http.Request) (interface{}, error) {
-	token := ""
-	if cookie, err := r.Cookie("access_token"); err == nil {
-		token = cookie.Value
-	}
-	if header := r.Header.Get("Styx-Access-Token"); header != "" {
-		token = header
-	}
+func DecodeHTTPAuthorizeTokenRequest(accessTokenCookie, accessTokenHeader, requestURLHeader string) httptransport.DecodeRequestFunc {
+	return func(_ context.Context, r *http.Request) (interface{}, error) {
+		token := ""
+		if cookie, err := r.Cookie(accessTokenCookie); err == nil {
+			token = cookie.Value
+		}
+		if header := r.Header.Get(accessTokenHeader); header != "" {
+			token = header
+		}
 
-	hostname, path := "", ""
-	requestURL := r.Header.Get("Request-Url")
-	if u, err := url.ParseRequestURI(requestURL); err == nil {
-		hostname = u.Host
-		path = u.Path
-	}
+		hostname, path := "", ""
+		requestURL := r.Header.Get(requestURLHeader)
+		if u, err := url.ParseRequestURI(requestURL); err == nil {
+			hostname = u.Host
+			path = u.Path
+		}
 
-	return authorizeTokenRequest{
-		Hostname: hostname,
-		Path:     path,
-		Token:    token,
-	}, nil
+		return authorizeTokenRequest{
+			Hostname: hostname,
+			Path:     path,
+			Token:    token,
+		}, nil
+	}
 }
 
 // EncodeHTTPAuthorizeTokenResponse is a transport/http.EncodeResponseFunc that encodes

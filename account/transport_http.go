@@ -18,7 +18,7 @@ import (
 // MakeHTTPHandler returns a handler that makes a set of endpoints available
 // on predefined paths.
 func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) http.Handler {
-	options := []httptransport.ServerOption{
+	opts := []httptransport.ServerOption{
 		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
 	}
@@ -28,28 +28,28 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		endpoints.CreateSessionEndpoint,
 		DecodeHTTPCreateSessionRequest,
 		EncodeHTTPCreateSessionResponse,
-		append(options, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Create session", logger)))...,
+		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Create session", logger)))...,
 	)
 	findSessionByTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.FindSessionByTokenEndpoint,
 		DecodeHTTPFindSessionByTokenRequest,
 		EncodeHTTPFindSessionByTokenResponse,
-		append(options, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Find session by token", logger)))...,
+		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Find session by token", logger)))...,
 	)
 	deleteSessionByTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.DeleteSessionByTokenEndpoint,
 		DecodeHTTPDeleteSessionByTokenRequest,
 		EncodeHTTPDeleteSessionByTokenResponse,
-		append(options, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Delete session by token", logger)))...,
+		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Delete session by token", logger)))...,
 	)
 	deleteSessionByOwnerTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.DeleteSessionsByOwnerTokenEndpoint,
 		DecodeHTTPDeleteSessionsByOwnerTokenRequest,
 		EncodeHTTPDeleteSessionsByOwnerTokenResponse,
-		append(options, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Delete session by owner token", logger)))...,
+		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Delete session by owner token", logger)))...,
 	)
 
 	r := chi.NewRouter()
