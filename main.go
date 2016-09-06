@@ -31,29 +31,50 @@ import (
 )
 
 const (
-	defaultHTTPAddr     = ":3000"
-	defaultGRPCAddr     = ":8082"
-	defaultZipkinAddr   = ""
-	defaultConfigFile   = "./config.yml"
+	// Tracing domain.
+	defaultZipkinAddr = ""
+	// Database domain.
 	defaultRedisAddr    = "redis:6379"
 	defaultRedisMaxConn = 16
+	// Business domain.
+	defaultDefaultTokenLength     = 64
+	defaultDefaultSessionValidity = 24 * time.Hour
+	// Transport domain.
+	defaultHTTPAddr = ":3000"
+	defaultGRPCAddr = ":8082"
+	// Config watcher.
+	defaultConfigFile = "./config.yml"
 )
 
 func main() {
 	var (
-		httpAddrEnv     = envString("HTTP_ADDR", defaultHTTPAddr)
-		grpcAddrEnv     = envString("GRPC_ADDR", defaultGRPCAddr)
-		zipkinAddrEnv   = envString("ZIPKIN_ADDR", defaultZipkinAddr)
-		configFileEnv   = envString("CONFIG_FILE", defaultConfigFile)
+		// Tracing domain.
+		zipkinAddrEnv = envString("ZIPKIN_ADDR", defaultZipkinAddr)
+		// Database domain.
 		redisAddrEnv    = envString("REDIS_ADDR", defaultRedisAddr)
 		redisMaxConnEnv = envInt("REDIS_MAX_CONN", defaultRedisMaxConn)
+		// Business domain.
+		defaultTokenLengthEnv     = envInt("DEFAULT_TOKEN_LENGTH", defaultDefaultTokenLength)
+		defaultSessionValidityEnv = envDuration("DEFAULT_SESSION_VALIDITY", defaultDefaultSessionValidity)
+		// Transport domain.
+		httpAddrEnv = envString("HTTP_ADDR", defaultHTTPAddr)
+		grpcAddrEnv = envString("GRPC_ADDR", defaultGRPCAddr)
+		// Config watcher.
+		configFileEnv = envString("CONFIG_FILE", defaultConfigFile)
 
-		httpAddr     = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
-		_            = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
-		zipkinAddr   = flag.String("zipkinAddr", zipkinAddrEnv, "Enable Zipkin tracing via server host:port")
-		configFile   = flag.String("configFile", configFileEnv, "Config file location")
+		// Tracing domain.
+		zipkinAddr = flag.String("zipkinAddr", zipkinAddrEnv, "Enable Zipkin tracing via server host:port")
+		// Database domain.
 		redisAddr    = flag.String("redisAddr", redisAddrEnv, "Redis server address")
 		redisMaxConn = flag.Int("redisMaxConn", redisMaxConnEnv, "Max simultaneous connections to Redis")
+		// Business domain.
+		defaultTokenLength     = flag.Int("defaultTokenLength", defaultTokenLengthEnv, "The default session token length")
+		defaultSessionValidity = flag.Duration("defaultSessionValidity", defaultSessionValidityEnv, "The default session validity duration")
+		// Transport domain.
+		httpAddr = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
+		_        = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
+		// Config watcher.
+		configFile = flag.String("configFile", configFileEnv, "Config file location")
 	)
 	flag.Parse()
 
@@ -86,7 +107,7 @@ func main() {
 				exitCode = 1
 				return
 			}
-			tracer, err = zipkin.NewTracer(zipkin.NewRecorder(collector, false, "localhost:80", "styx"))
+			tracer, err = zipkin.NewTracer(zipkin.NewRecorder(collector, false, "styx"+*httpAddr, "styx"))
 			if err != nil {
 				logger.Log("err", errors.Wrap(err, "could not create the Zipkin tracer"))
 				exitCode = 1
@@ -115,14 +136,17 @@ func main() {
 	// Business domain.
 	policyRepo := memory.NewPolicyRepository()
 	resourceRepo := memory.NewResourceRepository()
+	sessionRepo := redis.NewSessionRepository(
+		redisPool,
+		redis.DefaultTokenLength(*defaultTokenLength),
+		redis.DefaultSessionValidity(*defaultSessionValidity),
+	)
 	var authorizationService authorization.Service
 	{
-		sessionRepo := redis.NewSessionRepository(redisPool)
 		authorizationService = authorization.NewService(policyRepo, resourceRepo, sessionRepo)
 	}
 	var accountService account.Service
 	{
-		sessionRepo := redis.NewSessionRepository(redisPool)
 		accountService = account.NewService(sessionRepo)
 	}
 
@@ -271,6 +295,15 @@ func envString(env, fallback string) string {
 func envInt(env string, fallback int) int {
 	e := os.Getenv(env)
 	i, err := strconv.Atoi(e)
+	if e == "" || err != nil {
+		return fallback
+	}
+	return i
+}
+
+func envDuration(env string, fallback time.Duration) time.Duration {
+	e := os.Getenv(env)
+	i, err := time.ParseDuration(e)
 	if e == "" || err != nil {
 		return fallback
 	}

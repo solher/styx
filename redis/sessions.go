@@ -19,24 +19,33 @@ type sessionRepository struct {
 }
 
 // NewSessionRepository returns a new instance of a Redis backed session repository.
-func NewSessionRepository(pool *redigo.Pool) sessions.Repository {
-	return &sessionRepository{
+func NewSessionRepository(pool *redigo.Pool, opts ...SessionsOption) sessions.Repository {
+	r := &sessionRepository{
 		pool:                   pool,
 		defaultTokenLength:     64,
 		defaultSessionValidity: 24 * time.Hour,
 	}
-}
-
-// SetDefaultTokenLength sets the default length of generated session tokens.
-func (r *sessionRepository) SetDefaultTokenLength(tokenLength int) *sessionRepository {
-	r.defaultTokenLength = tokenLength
+	for _, opt := range opts {
+		opt(r)
+	}
 	return r
 }
 
-// SetDefaultSessionValidity sets the default duration of new sessions validity.
-func (r *sessionRepository) SetDefaultSessionValidity(sessionValidity time.Duration) *sessionRepository {
-	r.defaultSessionValidity = sessionValidity
-	return r
+// SessionsOption sets an optional parameter for the sessionRepository.
+type SessionsOption func(*sessionRepository)
+
+// DefaultTokenLength sets the default length of generated session tokens.
+func DefaultTokenLength(tokenLength int) SessionsOption {
+	return func(r *sessionRepository) {
+		r.defaultTokenLength = tokenLength
+	}
+}
+
+// DefaultSessionValidity sets the default duration of new sessions validity.
+func DefaultSessionValidity(sessionValidity time.Duration) SessionsOption {
+	return func(r *sessionRepository) {
+		r.defaultSessionValidity = sessionValidity
+	}
 }
 
 // Create creates a new session and returns it.
