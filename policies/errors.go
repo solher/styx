@@ -1,5 +1,10 @@
 package policies
 
+type errNotFound interface {
+	error
+	IsErrNotFound()
+}
+
 type errNotFoundBehavior struct{}
 
 func (e errNotFoundBehavior) IsErrNotFound() {}
@@ -13,4 +18,10 @@ func WithErrNotFound(err error) error {
 		err,
 		errNotFoundBehavior{},
 	}
+}
+
+// IsErrNotFound returns true if err implements errNotFound.
+func IsErrNotFound(err error) bool {
+	_, ok := err.(errNotFound)
+	return ok
 }
