@@ -56,17 +56,16 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 	}
 	if session.Token == "" {
 		session.Token = genToken(r.defaultTokenLength)
+	} else {
+		// We test the uniqueness of the token
+		exists, err := redigo.Bool(conn.Do("EXISTS", sessionKey(session.Token)))
+		if err != nil {
+			return nil, errors.Wrap(err, "could not test the token uniqueness")
+		}
+		if exists {
+			return nil, sessions.WithErrValidation(errors.New("session token must be unique"), "token", "unique")
+		}
 	}
-
-	// We test the uniqueness of the token
-	exists, err := redigo.Bool(conn.Do("EXISTS", sessionKey(session.Token)))
-	if err != nil {
-		return nil, errors.Wrap(err, "could not test the token uniqueness")
-	}
-	if exists {
-		return nil, sessions.WithErrValidation(errors.New("session token must be unique"), "token", "unique")
-	}
-
 	data, err := json.Marshal(session)
 	if err != nil {
 		return nil, errors.Wrap(err, "new session marshalling failed")
@@ -76,12 +75,10 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 	expiration := int(session.ValidTo.Sub(now).Seconds())
 	sessionKey := sessionKey(session.Token)
 	ownerSessionsKey := ownerSessionsKey(session.OwnerToken)
-	_, err = conn.Do("SET", sessionKey, string(data), "EX", expiration, "NX")
-	if err != nil {
-		return nil, errors.Wrap(errors.New(""), "could not set a new session")
+	if _, err = redigo.String(conn.Do("SET", sessionKey, string(data), "EX", expiration, "NX")); err != nil {
+		return nil, errors.Wrap(err, "could not set a new session")
 	}
-	_, err = conn.Do("HSETNX", ownerSessionsKey, sessionKey, "")
-	if err != nil {
+	if _, err = redigo.Int(conn.Do("HSETNX", ownerSessionsKey, sessionKey, "")); err != nil {
 		conn.Do("DEL", sessionKey)
 		return nil, errors.Wrap(err, "could not set the session in the ownerToken index")
 	}
@@ -90,7 +87,7 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 		return nil, errors.Wrap(err, "could not get the TTL of the ownerToken index")
 	}
 	if ttl < expiration {
-		_, err := conn.Do("EXPIRE", ownerSessionsKey, expiration)
+		_, err := redigo.Int(conn.Do("EXPIRE", ownerSessionsKey, expiration))
 		if err != nil {
 			conn.Do("DEL", sessionKey)
 			conn.Do("HDEL", ownerSessionsKey, sessionKey)
@@ -119,7 +116,6 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 	if len(toDelete) > 0 {
 		conn.Do("HDEL", append([]interface{}{ownerSessionsKey}, toDelete...)...)
 	}
-
 	return session, nil
 }
 
@@ -140,11 +136,9 @@ func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) (*s
 	if err != nil {
 		return nil, err
 	}
-	_, err = conn.Do("DEL", sessionKey(token))
-	if err != nil {
+	if _, err = redigo.Int(conn.Do("DEL", sessionKey(token))); err != nil {
 		return nil, errors.Wrap(err, "session deletion failed")
 	}
-
 	return session, nil
 }
 
@@ -174,8 +168,9 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 		}
 		deleted = append(deleted, session)
 	}
-	conn.Do("DEL", append([]interface{}{ownerSessionsKey}, sessionKeys...)...)
-
+	if _, err := redigo.Int(conn.Do("DEL", append([]interface{}{ownerSessionsKey}, sessionKeys...)...)); err != nil {
+		return nil, errors.Wrap(err, "could not delete the sessions by ownerToken")
+	}
 	return deleted, nil
 }
 
