@@ -9,9 +9,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// ErrValidation indicates that configuration file validation failed.
-var ErrValidation = errors.New("validation error")
-
 // Config represents a parsed configuration file.
 type Config struct {
 	Resources []resources.Resource `json:"resources" yaml:"resources"`
@@ -59,16 +56,16 @@ func FromFile(file []byte) (*Config, error) {
 func validateResource(names, hostnames map[string]struct{}) func(resource *resources.Resource) error {
 	return func(resource *resources.Resource) error {
 		if len(resource.Name) == 0 {
-			return errors.Wrap(ErrValidation, "resource name cannot be blank")
+			return errors.Errorf("resource name cannot be blank")
 		}
 		if len(resource.Hostname) == 0 {
-			return errors.Wrapf(ErrValidation, `resource '%s' hostname cannot be blank`, resource.Name)
+			return errors.Errorf(`resource '%s' hostname cannot be blank`, resource.Name)
 		}
 		if _, exists := names[resource.Name]; exists {
-			return errors.Wrapf(ErrValidation, `resource '%s' name must be unique`, resource.Name)
+			return errors.Errorf(`resource '%s' name must be unique`, resource.Name)
 		}
 		if _, exists := hostnames[resource.Hostname]; exists {
-			return errors.Wrapf(ErrValidation, `resource '%s' hostname must be unique`, resource.Name)
+			return errors.Errorf(`resource '%s' hostname must be unique`, resource.Name)
 		}
 		return nil
 	}
@@ -77,23 +74,23 @@ func validateResource(names, hostnames map[string]struct{}) func(resource *resou
 func validatePolicy(names, resourceNames map[string]struct{}) func(policy *policies.Policy) error {
 	return func(policy *policies.Policy) error {
 		if len(policy.Name) == 0 {
-			return errors.Wrap(ErrValidation, "policy name cannot be blank")
+			return errors.Errorf("policy name cannot be blank")
 		}
 		if policy.Permissions == nil || len(policy.Permissions) == 0 {
-			return errors.Wrapf(ErrValidation, `policy '%s' permissions cannot be blank`, policy.Name)
+			return errors.Errorf(`policy '%s' permissions cannot be blank`, policy.Name)
 		}
 		if _, exists := names[policy.Name]; exists {
-			return errors.Wrapf(ErrValidation, `policy '%s' name must be unique`, policy.Name)
+			return errors.Errorf(`policy '%s' name must be unique`, policy.Name)
 		}
 		for _, permission := range policy.Permissions {
 			if len(permission.Resource) == 0 {
-				return errors.Wrapf(ErrValidation, `policy '%s': resource cannot be blank`, policy.Name)
+				return errors.Errorf(`policy '%s': resource cannot be blank`, policy.Name)
 			}
 			if permission.Resource == "*" {
 				continue
 			}
 			if _, exists := resourceNames[permission.Resource]; !exists {
-				return errors.Wrapf(ErrValidation, `policy '%s': resource '%s' does not exists`, policy.Name, permission.Resource)
+				return errors.Errorf(`policy '%s': resource '%s' does not exists`, policy.Name, permission.Resource)
 			}
 		}
 		return nil
