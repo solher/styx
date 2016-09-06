@@ -4,23 +4,8 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/sessions"
 )
-
-type errValidation struct {
-	helpers.ErrBehavior
-	errValidationBehavior
-}
-
-func newErrValidation(msg, field, reason string) (err errValidation) {
-	defer func() {
-		err.Msg = msg
-		err.field = field
-		err.reason = reason
-	}()
-	return errValidation{}
-}
 
 // Service represents the account service interface.
 type Service interface {
@@ -44,7 +29,7 @@ func NewService(sessionRepo sessions.Repository) Service {
 // CreateSession creates a new session.
 func (s *service) CreateSession(ctx context.Context, session *sessions.Session) (*sessions.Session, error) {
 	if session.Policies == nil {
-		return nil, errors.Wrap(newErrValidation("session policies cannot be blank", "policies", "blank"), "validation failed")
+		return nil, withErrValidation(errors.New("session policies cannot be blank"), "policies", "blank")
 	}
 	return s.sessionRepo.Create(ctx, session)
 }

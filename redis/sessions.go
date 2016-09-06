@@ -8,45 +8,8 @@ import (
 
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/pkg/errors"
-	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/sessions"
 )
-
-type errNotFoundBehavior struct{}
-
-func (err errNotFoundBehavior) IsErrNotFound() {}
-
-type errValidationBehavior struct {
-	field, reason string
-}
-
-func (err errValidationBehavior) IsErrValidation() {}
-func (err errValidationBehavior) Field() string    { return err.field }
-func (err errValidationBehavior) Reason() string   { return err.reason }
-
-type errTokenUniqueness struct {
-	helpers.ErrBehavior
-	errValidationBehavior
-}
-
-func newErrTokenUniqueness(msg string) (err errTokenUniqueness) {
-	defer func() {
-		err.Msg = msg
-		err.field = "token"
-		err.reason = "unique"
-	}()
-	return errTokenUniqueness{}
-}
-
-type errSessionNotFound struct {
-	helpers.ErrBehavior
-	errNotFoundBehavior
-}
-
-func newErrSessionNotFound(msg string) (err errSessionNotFound) {
-	defer func() { err.Msg = msg }()
-	return errSessionNotFound{}
-}
 
 type sessionRepository struct {
 	pool *redigo.Pool
@@ -101,7 +64,7 @@ func (r *sessionRepository) Create(ctx context.Context, session *sessions.Sessio
 		return nil, errors.Wrap(err, "could not test the token uniqueness")
 	}
 	if exists {
-		return nil, errors.Wrap(newErrTokenUniqueness("the session token must be unique"), "validation failed")
+		return nil, sessions.WithErrValidation(errors.New("session token must be unique"), "token", "unique")
 	}
 
 	data, err := json.Marshal(session)
@@ -219,7 +182,7 @@ func (r *sessionRepository) DeleteByOwnerToken(ctx context.Context, ownerToken s
 func getSession(conn redigo.Conn, key string) (*sessions.Session, error) {
 	val, err := redigo.Bytes(conn.Do("GET", key))
 	if err != nil {
-		return nil, errors.Wrap(newErrSessionNotFound(err.Error()), "could not get a session by key")
+		return nil, sessions.WithErrNotFound(errors.Wrap(err, "could not get a session by key"))
 	}
 	session := &sessions.Session{}
 	if err := json.Unmarshal(val, session); err != nil {

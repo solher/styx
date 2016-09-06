@@ -6,19 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/resources"
 )
-
-type errResourceNotFound struct {
-	helpers.ErrBehavior
-	errNotFoundBehavior
-}
-
-func newErrResourceNotFound(msg string) (err errResourceNotFound) {
-	defer func() { err.Msg = msg }()
-	return errResourceNotFound{}
-}
 
 type (
 	resourceHostname string
@@ -59,7 +48,7 @@ func (r *resourceRepository) FindByHostname(ctx context.Context, hostname string
 	defer r.mtx.RUnlock()
 	resource, ok := r.resources[resourceHostname(hostname)]
 	if !ok {
-		return nil, newErrResourceNotFound("resource resource not found")
+		return nil, resources.WithErrNotFound(errors.New("resource resource not found"))
 	}
 	return resource, nil
 }

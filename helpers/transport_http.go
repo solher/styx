@@ -10,29 +10,51 @@ import (
 	"github.com/pkg/errors"
 )
 
-type (
-	errBodyDecodingType interface {
+// Types
+type errBodyDecoding interface {
+	error
+	IsErrBodyDecoding()
+}
+
+type errQueryParam interface {
+	error
+	IsErrQueryParam()
+	Key() string
+}
+
+// Behaviors
+type errBodyDecodingBehavior struct{}
+
+func (e errBodyDecodingBehavior) IsErrBodyDecoding() {}
+
+func WithErrBodyDecoding(err error) error {
+	return struct {
 		error
-		IsErrBodyDecoding()
+		errBodyDecodingBehavior
+	}{
+		err,
+		errBodyDecodingBehavior{},
 	}
-	ErrBodyDecodingBehavior struct{}
-)
+}
 
-func (err ErrBodyDecodingBehavior) IsErrBodyDecoding() {}
+type errQueryParamBehavior struct {
+	key string
+}
 
-type (
-	errQueryParamType interface {
+func (e errQueryParamBehavior) IsErrQueryParam() {}
+func (e errQueryParamBehavior) Key() string      { return e.key }
+
+func WithErrQueryParam(err error, key string) error {
+	return struct {
 		error
-		IsErrQueryParam()
-		Key() string
+		errQueryParamBehavior
+	}{
+		err,
+		errQueryParamBehavior{
+			key: key,
+		},
 	}
-	ErrQueryParamBehavior struct {
-		ParamKey string
-	}
-)
-
-func (err ErrQueryParamBehavior) IsErrQueryParam() {}
-func (err ErrQueryParamBehavior) Key() string      { return err.ParamKey }
+}
 
 func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
 	var apiError APIError
@@ -42,9 +64,9 @@ func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter
 		switch e1.Domain {
 		case httptransport.DomainDecode:
 			switch e2 := errors.Cause(err).(type) {
-			case errBodyDecodingType:
+			case errBodyDecoding:
 				apiError = APIBodyDecoding
-			case errQueryParamType:
+			case errQueryParam:
 				apiError = APIQueryParam
 				apiError.Params["key"] = e2.Key()
 			default:

@@ -7,7 +7,6 @@ import (
 	"net/url"
 
 	stdopentracing "github.com/opentracing/opentracing-go"
-	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	"github.com/solher/styx/helpers"
 	"golang.org/x/net/context"
@@ -127,20 +126,10 @@ func EncodeHTTPRedirectResponse(ctx context.Context, w http.ResponseWriter, resp
 	return nil
 }
 
-type (
-	errDeniedAccessType interface {
-		error
-		IsDeniedAccess()
-	}
-	errDeniedAccessBehavior struct{}
-)
-
-func (err errDeniedAccessBehavior) IsDeniedAccess() {}
-
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
 	var apiError helpers.APIError
-	switch errors.Cause(err).(type) {
-	case errDeniedAccessType:
+	switch err.(type) {
+	case errDeniedAccess:
 		apiError = helpers.APIUnauthorized
 	default:
 		return err

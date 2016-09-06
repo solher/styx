@@ -3,12 +3,14 @@ package authorization_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/solher/styx/authorization"
-	"github.com/solher/styx/helpers"
+	"github.com/solher/styx/memory"
 	"github.com/solher/styx/policies"
+	"github.com/solher/styx/redis"
 	"github.com/solher/styx/resources"
 	"github.com/solher/styx/sessions"
 )
@@ -197,11 +199,11 @@ func TestAuthorizeToken(t *testing.T) {
 			name:     "guest policy does not exists",
 			hostname: simpleResource.Hostname, path: "", token: "F00bAr",
 			policyRepoFindByNamePolicy:         nil,
-			policyRepoFindByNameError:          newErrNotFound("policy not found"),
+			policyRepoFindByNameError:          memory.WithErrNotFound(errors.New("policy not found")),
 			resourceRepoFindByHostnameResource: simpleResource,
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      nil,
-			sessionRepoFindByTokenError:        newErrNotFound("session not found"),
+			sessionRepoFindByTokenError:        redis.WithErrNotFound(errors.New("session not found")),
 			session:                            nil, errorExpected: true,
 		},
 		{
@@ -212,7 +214,7 @@ func TestAuthorizeToken(t *testing.T) {
 			resourceRepoFindByHostnameResource: simpleResource,
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      nil,
-			sessionRepoFindByTokenError:        newErrNotFound("session not found"),
+			sessionRepoFindByTokenError:        redis.WithErrNotFound(errors.New("session not found")),
 			session:                            nil, errorExpected: false,
 		},
 	}
@@ -235,20 +237,6 @@ func TestAuthorizeToken(t *testing.T) {
 			}
 		})
 	}
-}
-
-type errNotFoundBehavior struct{}
-
-func (err errNotFoundBehavior) IsErrNotFound() {}
-
-type errNotFound struct {
-	helpers.ErrBehavior
-	errNotFoundBehavior
-}
-
-func newErrNotFound(msg string) (err errNotFound) {
-	defer func() { err.Msg = msg }()
-	return errNotFound{}
 }
 
 func format(v interface{}) string {
