@@ -10,23 +10,23 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Types
-type errBodyDecoding interface {
-	error
-	IsErrBodyDecoding()
-}
+type (
+	errBodyDecoding interface {
+		error
+		IsErrBodyDecoding()
+	}
+	errQueryParam interface {
+		error
+		IsErrQueryParam()
+		Key() string
+	}
+)
 
-type errQueryParam interface {
-	error
-	IsErrQueryParam()
-	Key() string
-}
-
-// Behaviors
 type errBodyDecodingBehavior struct{}
 
 func (e errBodyDecodingBehavior) IsErrBodyDecoding() {}
 
+// WithErrBodyDecoding adds a errBodyDecodingBehavior to the given error.
 func WithErrBodyDecoding(err error) error {
 	return struct {
 		error
@@ -44,6 +44,7 @@ type errQueryParamBehavior struct {
 func (e errQueryParamBehavior) IsErrQueryParam() {}
 func (e errQueryParamBehavior) Key() string      { return e.key }
 
+// WithErrQueryParam adds a errQueryParamBehavior to the given error.
 func WithErrQueryParam(err error, key string) error {
 	return struct {
 		error

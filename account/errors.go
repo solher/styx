@@ -1,6 +1,5 @@
 package account
 
-// Types
 type (
 	errNotFound interface {
 		error
@@ -14,7 +13,6 @@ type (
 	}
 )
 
-// Behaviors
 type errNotFoundBehavior struct{}
 
 func (e errNotFoundBehavior) IsErrNotFound() {}

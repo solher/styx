@@ -1,6 +1,5 @@
 package authorization
 
-// Types
 type (
 	errNotFound interface {
 		error
@@ -12,7 +11,6 @@ type (
 	}
 )
 
-// Behaviors
 type errDeniedAccessBehavior struct{}
 
 func (err errDeniedAccessBehavior) IsDeniedAccess() {}

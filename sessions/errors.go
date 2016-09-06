@@ -1,10 +1,10 @@
 package sessions
 
-// Behaviors
 type errNotFoundBehavior struct{}
 
 func (e errNotFoundBehavior) IsErrNotFound() {}
 
+// WithErrNotFound adds a errNotFoundBehavior to the given error.
 func WithErrNotFound(err error) error {
 	return struct {
 		error
@@ -23,6 +23,7 @@ func (e errValidationBehavior) IsErrValidation() {}
 func (e errValidationBehavior) Field() string    { return e.field }
 func (e errValidationBehavior) Reason() string   { return e.reason }
 
+// WithErrValidation adds a errValidationBehavior to the given error.
 func WithErrValidation(err error, field, reason string) error {
 	return struct {
 		error
