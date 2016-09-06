@@ -7,20 +7,12 @@ import (
 	"golang.org/x/net/context"
 
 	httptransport "github.com/go-kit/kit/transport/http"
-	"github.com/pkg/errors"
 )
 
-type (
-	errBodyDecoding interface {
-		error
-		IsErrBodyDecoding()
-	}
-	errQueryParam interface {
-		error
-		IsErrQueryParam()
-		Key() string
-	}
-)
+type errBodyDecoding interface {
+	error
+	IsErrBodyDecoding()
+}
 
 type errBodyDecodingBehavior struct{}
 
@@ -37,12 +29,23 @@ func WithErrBodyDecoding(err error) error {
 	}
 }
 
+func isErrBodyDecoding(err error) bool {
+	_, ok := err.(errBodyDecoding)
+	return ok
+}
+
+type errQueryParam interface {
+	error
+	IsErrQueryParam()
+	QueryParamKey() string
+}
+
 type errQueryParamBehavior struct {
 	key string
 }
 
-func (e errQueryParamBehavior) IsErrQueryParam() {}
-func (e errQueryParamBehavior) Key() string      { return e.key }
+func (e errQueryParamBehavior) IsErrQueryParam()      {}
+func (e errQueryParamBehavior) QueryParamKey() string { return e.key }
 
 // WithErrQueryParam adds a errQueryParamBehavior to the given error.
 func WithErrQueryParam(err error, key string) error {
@@ -57,6 +60,13 @@ func WithErrQueryParam(err error, key string) error {
 	}
 }
 
+func isErrQueryParam(err error) (string, bool) {
+	if e, ok := err.(errQueryParam); ok {
+		return e.QueryParamKey(), true
+	}
+	return "", false
+}
+
 func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) {
 	var apiError APIError
 	switch e1 := err.(type) {
@@ -64,13 +74,12 @@ func TransportErrorEncoder(ctx context.Context, err error, w http.ResponseWriter
 		err = e1.Err
 		switch e1.Domain {
 		case httptransport.DomainDecode:
-			switch e2 := errors.Cause(err).(type) {
-			case errBodyDecoding:
+			if isErrBodyDecoding(err) {
 				apiError = APIBodyDecoding
-			case errQueryParam:
+			} else if key, ok := isErrQueryParam(err); ok {
 				apiError = APIQueryParam
-				apiError.Params["key"] = e2.Key()
-			default:
+				apiError.Params["key"] = key
+			} else {
 				apiError = APIInternal
 				TraceError(ctx, err)
 			}

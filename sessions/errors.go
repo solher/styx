@@ -19,9 +19,9 @@ type errValidationBehavior struct {
 	field, reason string
 }
 
-func (e errValidationBehavior) IsErrValidation() {}
-func (e errValidationBehavior) Field() string    { return e.field }
-func (e errValidationBehavior) Reason() string   { return e.reason }
+func (e errValidationBehavior) IsErrValidation()         {}
+func (e errValidationBehavior) ValidationField() string  { return e.field }
+func (e errValidationBehavior) ValidationReason() string { return e.reason }
 
 // WithErrValidation adds a errValidationBehavior to the given error.
 func WithErrValidation(err error, field, reason string) error {

@@ -1,39 +1,29 @@
 package account
 
-type (
-	errNotFound interface {
-		error
-		IsErrNotFound()
-	}
-	errValidation interface {
-		error
-		IsErrValidation()
-		Field() string
-		Reason() string
-	}
-)
+type errNotFound interface {
+	error
+	IsErrNotFound()
+}
 
-type errNotFoundBehavior struct{}
+func isErrNotFound(err error) bool {
+	_, ok := err.(errNotFound)
+	return ok
+}
 
-func (e errNotFoundBehavior) IsErrNotFound() {}
-
-func withErrNotFound(err error) error {
-	return struct {
-		error
-		errNotFoundBehavior
-	}{
-		err,
-		errNotFoundBehavior{},
-	}
+type errValidation interface {
+	error
+	IsErrValidation()
+	ValidationField() string
+	ValidationReason() string
 }
 
 type errValidationBehavior struct {
 	field, reason string
 }
 
-func (e errValidationBehavior) IsErrValidation() {}
-func (e errValidationBehavior) Field() string    { return e.field }
-func (e errValidationBehavior) Reason() string   { return e.reason }
+func (e errValidationBehavior) IsErrValidation()         {}
+func (e errValidationBehavior) ValidationField() string  { return e.field }
+func (e errValidationBehavior) ValidationReason() string { return e.reason }
 
 func withErrValidation(err error, field, reason string) error {
 	return struct {
@@ -46,4 +36,11 @@ func withErrValidation(err error, field, reason string) error {
 			reason: reason,
 		},
 	}
+}
+
+func isErrValidation(err error) (string, string, bool) {
+	if e, ok := err.(errValidation); ok {
+		return e.ValidationField(), e.ValidationReason(), true
+	}
+	return "", "", false
 }
