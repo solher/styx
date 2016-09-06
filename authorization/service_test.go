@@ -8,9 +8,7 @@ import (
 	"testing"
 
 	"github.com/solher/styx/authorization"
-	"github.com/solher/styx/memory"
 	"github.com/solher/styx/policies"
-	"github.com/solher/styx/redis"
 	"github.com/solher/styx/resources"
 	"github.com/solher/styx/sessions"
 )
@@ -199,11 +197,11 @@ func TestAuthorizeToken(t *testing.T) {
 			name:     "guest policy does not exists",
 			hostname: simpleResource.Hostname, path: "", token: "F00bAr",
 			policyRepoFindByNamePolicy:         nil,
-			policyRepoFindByNameError:          memory.WithErrNotFound(errors.New("policy not found")),
+			policyRepoFindByNameError:          policies.WithErrNotFound(errors.New("policy not found")),
 			resourceRepoFindByHostnameResource: simpleResource,
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      nil,
-			sessionRepoFindByTokenError:        redis.WithErrNotFound(errors.New("session not found")),
+			sessionRepoFindByTokenError:        sessions.WithErrNotFound(errors.New("session not found")),
 			session:                            nil, errorExpected: true,
 		},
 		{
@@ -214,7 +212,7 @@ func TestAuthorizeToken(t *testing.T) {
 			resourceRepoFindByHostnameResource: simpleResource,
 			resourceRepoFindByHostnameError:    nil,
 			sessionRepoFindByTokenSession:      nil,
-			sessionRepoFindByTokenError:        redis.WithErrNotFound(errors.New("session not found")),
+			sessionRepoFindByTokenError:        sessions.WithErrNotFound(errors.New("session not found")),
 			session:                            nil, errorExpected: false,
 		},
 	}
