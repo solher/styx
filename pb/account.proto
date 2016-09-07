@@ -1,0 +1,57 @@
+syntax = "proto3";
+package pb;
+import "google/protobuf/timestamp.proto";
+
+message Session {
+  google.protobuf.Timestamp created = 1;
+  google.protobuf.Timestamp valid_to = 2;
+  string token = 3;
+  string owner_token = 4;
+  string agent = 5;
+  string ip = 6;
+  repeated string policies = 7;
+  bytes payload = 8;
+}
+
+service Account {
+  rpc CreateSession (CreateSessionRequest) returns (CreateSessionReply) {}
+  rpc FindSessionByToken (FindSessionByTokenRequest) returns (FindSessionByTokenReply) {}
+  rpc DeleteSessionByToken (DeleteSessionByTokenRequest) returns (DeleteSessionByTokenReply) {}
+  rpc DeleteSessionsByOwnerToken (DeleteSessionsByOwnerTokenRequest) returns (DeleteSessionsByOwnerTokenReply) {}
+}
+
+message CreateSessionRequest {
+  Session session = 1;
+}
+
+message CreateSessionReply {
+  Session session = 1;
+  string err = 2;
+}
+
+message FindSessionByTokenRequest {
+  string token = 1;
+}
+
+message FindSessionByTokenReply {
+   Session session = 1;
+  string err = 2;
+}
+
+message DeleteSessionByTokenRequest {
+  string token = 1;
+}
+
+message DeleteSessionByTokenReply {
+  Session session = 1;
+  string err = 2;
+}
+
+message DeleteSessionsByOwnerTokenRequest {
+  string owner_token = 1;
+}
+
+message DeleteSessionsByOwnerTokenReply {
+  repeated Session sessions = 1;
+  string err = 2;
+}

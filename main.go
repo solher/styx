@@ -1,3 +1,4 @@
+//go:generate protoc -I ./pb ./pb/*.proto --go_out=plugins=grpc:pb
 package main
 
 import (
