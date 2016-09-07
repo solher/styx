@@ -3,6 +3,7 @@ package authorization
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -23,9 +24,13 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		httptransport.ServerErrorLogger(logger),
 	}
 	handlerOpts := &httpHandlerOptions{
-		accessTokenCookie: "access_token",
-		accessTokenHeader: "Styx-Access-Token",
-		requestURLHeader:  "Request-Url",
+		accessTokenCookie:     "access_token",
+		accessTokenHeader:     "Styx-Access-Token",
+		payloadHeader:         "Styx-Payload",
+		sessionHeader:         "Styx-Session",
+		redirectURLHeader:     "Redirect-Url",
+		redirectURLQueryParam: "redirectUrl",
+		requestURLHeader:      "Request-Url",
 	}
 	for _, opt := range opts {
 		opt(handlerOpts)
@@ -35,14 +40,14 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		ctx,
 		endpoints.AuthorizeTokenEndpoint,
 		DecodeHTTPAuthorizeTokenRequest(handlerOpts.accessTokenCookie, handlerOpts.accessTokenHeader, handlerOpts.requestURLHeader),
-		EncodeHTTPAuthorizeTokenResponse,
+		EncodeHTTPAuthorizeTokenResponse(handlerOpts.accessTokenHeader, handlerOpts.payloadHeader, handlerOpts.sessionHeader),
 		append(transportOpts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Authorize token", logger)))...,
 	)
 	redirectHandler := httptransport.NewServer(
 		ctx,
 		endpoints.RedirectEndpoint,
-		DecodeHTTPRedirectRequest,
-		EncodeHTTPRedirectResponse,
+		DecodeHTTPRedirectRequest(handlerOpts.requestURLHeader),
+		EncodeHTTPRedirectResponse(handlerOpts.redirectURLHeader, handlerOpts.redirectURLQueryParam),
 		append(transportOpts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Redirect URL", logger)))...,
 	)
 
@@ -54,9 +59,13 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 }
 
 type httpHandlerOptions struct {
-	accessTokenCookie string
-	accessTokenHeader string
-	requestURLHeader  string
+	accessTokenCookie     string
+	accessTokenHeader     string
+	payloadHeader         string
+	sessionHeader         string
+	redirectURLHeader     string
+	redirectURLQueryParam string
+	requestURLHeader      string
 }
 
 // HTTPHandlerOption sets an optional parameter for the HTTP handler.
@@ -73,6 +82,38 @@ func AccessTokenCookie(key string) HTTPHandlerOption {
 func AccessTokenHeader(header string) HTTPHandlerOption {
 	return func(o *httpHandlerOptions) {
 		o.accessTokenHeader = header
+	}
+}
+
+// PayloadHeader sets the header where the session payload is set if
+// access is granted.
+func PayloadHeader(header string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.payloadHeader = header
+	}
+}
+
+// SessionHeader sets the header where the session is set if
+// access is granted.
+func SessionHeader(header string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.sessionHeader = header
+	}
+}
+
+// RedirectURLHeader sets the header where the redirect URL (the original
+// user request URL) is set.
+func RedirectURLHeader(header string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.redirectURLHeader = header
+	}
+}
+
+// RedirectURLQueryParam sets the query parameter key where the
+// redirect URL (the original user request URL) is set.
+func RedirectURLQueryParam(key string) HTTPHandlerOption {
+	return func(o *httpHandlerOptions) {
+		o.redirectURLQueryParam = key
 	}
 }
 
@@ -112,58 +153,64 @@ func DecodeHTTPAuthorizeTokenRequest(accessTokenCookie, accessTokenHeader, reque
 
 // EncodeHTTPAuthorizeTokenResponse is a transport/http.EncodeResponseFunc that encodes
 // the response as JSON to the response writer.
-func EncodeHTTPAuthorizeTokenResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-	res := response.(authorizeTokenResponse)
-	if res.Err != nil {
-		return businessErrorEncoder(ctx, res.Err, w)
-	}
-
-	w.Header().Add("Styx-Access-Token", res.Token)
-	if res.Session != nil {
-		if res.Session.Payload != nil {
-			payload := base64.StdEncoding.EncodeToString(res.Session.Payload)
-			w.Header().Add("Styx-Payload", payload)
+func EncodeHTTPAuthorizeTokenResponse(accessTokenHeader, payloadHeader, sessionHeader string) httptransport.EncodeResponseFunc {
+	return func(ctx context.Context, w http.ResponseWriter, response interface{}) error {
+		res := response.(authorizeTokenResponse)
+		if res.Err != nil {
+			return businessErrorEncoder(ctx, res.Err, w)
 		}
 
-		res.Session.Policies = nil
-		res.Session.Payload = nil
-		s, _ := json.Marshal(res.Session)
-		enc := base64.StdEncoding.EncodeToString(s)
-		w.Header().Add("Styx-Session", enc)
-	}
+		w.Header().Add(accessTokenHeader, res.Token)
+		if res.Session != nil {
+			if res.Session.Payload != nil {
+				payload := base64.StdEncoding.EncodeToString(res.Session.Payload)
+				w.Header().Add(payloadHeader, payload)
+			}
 
-	defer helpers.TraceStatusAndFinish(ctx, 204)
-	w.WriteHeader(204)
-	return nil
+			res.Session.Policies = nil
+			res.Session.Payload = nil
+			s, _ := json.Marshal(res.Session)
+			enc := base64.StdEncoding.EncodeToString(s)
+			w.Header().Add(sessionHeader, enc)
+		}
+
+		defer helpers.TraceStatusAndFinish(ctx, 204)
+		w.WriteHeader(204)
+		return nil
+	}
 }
 
 // DecodeHTTPRedirectRequest is a transport/http.DecodeRequestFunc that decodes the
 // JSON-encoded request from the HTTP request body.
-func DecodeHTTPRedirectRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	hostname := ""
-	requestURL := r.Header.Get("Request-Url")
-	if u, err := url.ParseRequestURI(requestURL); err == nil {
-		hostname = u.Host
+func DecodeHTTPRedirectRequest(requestURLHeader string) httptransport.DecodeRequestFunc {
+	return func(_ context.Context, r *http.Request) (interface{}, error) {
+		hostname := ""
+		requestURL := r.Header.Get(requestURLHeader)
+		if u, err := url.ParseRequestURI(requestURL); err == nil {
+			hostname = u.Host
+		}
+		return redirectRequest{
+			RequestURL: requestURL,
+			Hostname:   hostname,
+		}, nil
 	}
-	return redirectRequest{
-		RequestURL: requestURL,
-		Hostname:   hostname,
-	}, nil
 }
 
 // EncodeHTTPRedirectResponse is a transport/http.EncodeResponseFunc that encodes
 // the response as JSON to the response writer.
-func EncodeHTTPRedirectResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-	res := response.(redirectResponse)
-	if res.Err != nil {
-		return businessErrorEncoder(ctx, res.Err, w)
-	}
-	w.Header().Add("Location", res.RedirectURL+"?redirectUrl="+res.RequestURL)
-	w.Header().Add("Redirect-Url", res.RequestURL)
+func EncodeHTTPRedirectResponse(redirectURLHeader, redirectURLQueryParam string) httptransport.EncodeResponseFunc {
+	return func(ctx context.Context, w http.ResponseWriter, response interface{}) error {
+		res := response.(redirectResponse)
+		if res.Err != nil {
+			return businessErrorEncoder(ctx, res.Err, w)
+		}
+		w.Header().Add("Location", fmt.Sprintf("%s?%s=%s", res.RedirectURL, redirectURLQueryParam, res.RequestURL))
+		w.Header().Add(redirectURLHeader, res.RequestURL)
 
-	defer helpers.TraceStatusAndFinish(ctx, 307)
-	w.WriteHeader(307)
-	return nil
+		defer helpers.TraceStatusAndFinish(ctx, 307)
+		w.WriteHeader(307)
+		return nil
+	}
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {

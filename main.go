@@ -41,9 +41,13 @@ const (
 	defaultDefaultTokenLength     = 64
 	defaultDefaultSessionValidity = 24 * time.Hour
 	// Authorization service.
-	defaultAccessTokenCookie = "access_token"
-	defaultAccessTokenHeader = "Styx-Access-Token"
-	defaultRequestURLHeader  = "Request-Url"
+	defaultAccessTokenCookie     = "access_token"
+	defaultAccessTokenHeader     = "Styx-Access-Token"
+	defaultPayloadHeader         = "Styx-Payload"
+	defaultSessionHeader         = "Styx-Session"
+	defaultRedirectURLHeader     = "Redirect-Url"
+	defaultRedirectURLQueryParam = "redirectUrl"
+	defaultRequestURLHeader      = "Request-Url"
 	// Transport domain.
 	defaultHTTPAddr = ":3000"
 	defaultGRPCAddr = ":8082"
@@ -63,9 +67,13 @@ func main() {
 		defaultTokenLengthEnv     = envInt("DEFAULT_TOKEN_LENGTH", defaultDefaultTokenLength)
 		defaultSessionValidityEnv = envDuration("DEFAULT_SESSION_VALIDITY", defaultDefaultSessionValidity)
 		// Authorization service.
-		accessTokenCookieEnv = envString("ACCESS_TOKEN_COOKIE", defaultAccessTokenCookie)
-		accessTokenHeaderEnv = envString("ACCESS_TOKEN_HEADER", defaultAccessTokenHeader)
-		requestURLHeaderEnv  = envString("REQUEST_URL_HEADER", defaultRequestURLHeader)
+		accessTokenCookieEnv     = envString("ACCESS_TOKEN_COOKIE", defaultAccessTokenCookie)
+		accessTokenHeaderEnv     = envString("ACCESS_TOKEN_HEADER", defaultAccessTokenHeader)
+		payloadHeaderEnv         = envString("PAYLOAD_HEADER", defaultPayloadHeader)
+		sessionHeaderEnv         = envString("SESSION_HEADER", defaultSessionHeader)
+		redirectURLHeaderEnv     = envString("REDIRECT_URL_HEADER", defaultRedirectURLHeader)
+		redirectURLQueryParamEnv = envString("REDIRECT_URL_QUERY_PARAM", defaultRedirectURLQueryParam)
+		requestURLHeaderEnv      = envString("REQUEST_URL_HEADER", defaultRequestURLHeader)
 		// Transport domain.
 		httpAddrEnv = envString("HTTP_ADDR", defaultHTTPAddr)
 		grpcAddrEnv = envString("GRPC_ADDR", defaultGRPCAddr)
@@ -84,9 +92,13 @@ func main() {
 		defaultTokenLength     = flag.Int("defaultTokenLength", defaultTokenLengthEnv, "The default session token length")
 		defaultSessionValidity = flag.Duration("defaultSessionValidity", defaultSessionValidityEnv, "The default session validity duration")
 		// Authorization service.
-		accessTokenCookie = flag.String("accessTokenCookie", accessTokenCookieEnv, "The cookie key to get the access token from")
-		accessTokenHeader = flag.String("accessTokenHeader", accessTokenHeaderEnv, "The HTTP header to get the access token from")
-		requestURLHeader  = flag.String("requestURLHeader", requestURLHeaderEnv, "The HTTP header to get the URL requested by the user")
+		accessTokenCookie     = flag.String("accessTokenCookie", accessTokenCookieEnv, "The cookie key to get the access token from")
+		accessTokenHeader     = flag.String("accessTokenHeader", accessTokenHeaderEnv, "The HTTP header to get the access token from")
+		payloadHeader         = flag.String("payloadHeader", payloadHeaderEnv, "The HTTP header where the session payload is set when access is granted")
+		sessionHeader         = flag.String("sessionHeader", sessionHeaderEnv, "The HTTP header where the session is set when access is granted")
+		redirectURLHeader     = flag.String("redirectURLHeader", redirectURLHeaderEnv, "The HTTP header where the redirect URL (the original user request URL) is set")
+		redirectURLQueryParam = flag.String("redirectURLQueryParam", redirectURLQueryParamEnv, "The query parameter where the redirect URL (the original user request URL) is set")
+		requestURLHeader      = flag.String("requestURLHeader", requestURLHeaderEnv, "The HTTP header to get the URL requested by the user")
 		// Transport domain.
 		httpAddr = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
 		_        = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
@@ -224,6 +236,10 @@ func main() {
 		logger,
 		authorization.AccessTokenCookie(*accessTokenCookie),
 		authorization.AccessTokenHeader(*accessTokenHeader),
+		authorization.PayloadHeader(*payloadHeader),
+		authorization.SessionHeader(*sessionHeader),
+		authorization.RedirectURLHeader(*redirectURLHeader),
+		authorization.RedirectURLQueryParam(*redirectURLQueryParam),
 		authorization.RequestURLHeader(*requestURLHeader),
 	)
 	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
