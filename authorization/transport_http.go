@@ -35,7 +35,6 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 	for _, opt := range opts {
 		opt(handlerOpts)
 	}
-
 	authorizeTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.AuthorizeTokenEndpoint,

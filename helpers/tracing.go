@@ -8,15 +8,38 @@ import (
 	"net/http"
 	"strings"
 
+	"google.golang.org/grpc/metadata"
+
 	"golang.org/x/net/context"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/tracing/opentracing"
+	grpctransport "github.com/go-kit/kit/transport/grpc"
 	httptransport "github.com/go-kit/kit/transport/http"
+
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 )
+
+func FromGRPCRequest(tracer stdopentracing.Tracer, operationName string, logger log.Logger) grpctransport.RequestFunc {
+	return func(ctx context.Context, md *metadata.MD) context.Context {
+		ctx = opentracing.FromGRPCRequest(tracer, operationName, logger)(ctx, md)
+		if span := stdopentracing.SpanFromContext(ctx); span != nil {
+			span = span.SetTag("transport", "gRPC")
+			ctx = stdopentracing.ContextWithSpan(ctx, span)
+		}
+		return ctx
+	}
+}
+
+func GRPCFinish() grpctransport.ResponseFunc {
+	return func(ctx context.Context, _ *metadata.MD) {
+		if span := stdopentracing.SpanFromContext(ctx); span != nil {
+			span.Finish()
+		}
+	}
+}
 
 func FromHTTPRequest(tracer stdopentracing.Tracer, operationName string, logger log.Logger) httptransport.RequestFunc {
 	return func(ctx context.Context, r *http.Request) context.Context {

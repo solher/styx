@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc"
+
 	zipkin "github.com/openzipkin/zipkin-go-opentracing"
 
 	"github.com/fsnotify/fsnotify"
@@ -28,6 +30,7 @@ import (
 	"github.com/solher/styx/config"
 	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/memory"
+	"github.com/solher/styx/pb"
 	"github.com/solher/styx/redis"
 )
 
@@ -102,7 +105,7 @@ func main() {
 		requestURLHeader      = flag.String("requestURLHeader", requestURLHeaderEnv, "The HTTP header to get the URL requested by the user")
 		// Transport domain.
 		httpAddr = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
-		_        = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
+		grpcAddr = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
 		// Config watcher.
 		configFile = flag.String("configFile", configFileEnv, "Config file location")
 	)
@@ -250,17 +253,35 @@ func main() {
 	r.Mount("/auth", authorizationHandler)
 	r.Mount("/account", accountHandler)
 
-	conn, err := net.Listen("tcp", *httpAddr)
+	httpConn, err := net.Listen("tcp", *httpAddr)
 	if err != nil {
 		logger.Log("err", errors.Wrap(err, "could not create a TCP connection"))
 		exitCode = 1
 		return
 	}
-	defer conn.Close()
+	defer httpConn.Close()
 	logger.Log("msg", "listening on "+*httpAddr+" (HTTP)")
 	go func() {
-		if err := http.Serve(conn, r); err != nil {
+		if err := http.Serve(httpConn, r); err != nil {
 			errc <- errors.Wrap(err, "the http server returned an error")
+			return
+		}
+	}()
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterAccountServer(grpcServer, account.MakeGRPCServer(ctx, accountEndpoints, tracer, logger))
+
+	grpcConn, err := net.Listen("tcp", *grpcAddr)
+	if err != nil {
+		logger.Log("err", err)
+		exitCode = 1
+		return
+	}
+	defer grpcConn.Close()
+	logger.Log("msg", "listening on "+*grpcAddr+" (gRPC)")
+	go func() {
+		if err := grpcServer.Serve(grpcConn); err != nil {
+			errc <- errors.Wrap(err, "the gRPC server returned an error")
 			return
 		}
 	}()

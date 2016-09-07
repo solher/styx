@@ -22,7 +22,6 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
 	}
-
 	createSessionHandler := httptransport.NewServer(
 		ctx,
 		endpoints.CreateSessionEndpoint,
