@@ -41,6 +41,17 @@ func GRPCFinish() grpctransport.ResponseFunc {
 	}
 }
 
+func ToGRPCRequest(tracer stdopentracing.Tracer, logger log.Logger) grpctransport.RequestFunc {
+	return func(ctx context.Context, md *metadata.MD) context.Context {
+		ctx = opentracing.ToGRPCRequest(tracer, logger)(ctx, md)
+		if span := stdopentracing.SpanFromContext(ctx); span != nil {
+			span = span.SetTag("transport", "gRPC")
+			ctx = stdopentracing.ContextWithSpan(ctx, span)
+		}
+		return ctx
+	}
+}
+
 func FromHTTPRequest(tracer stdopentracing.Tracer, operationName string, logger log.Logger) httptransport.RequestFunc {
 	return func(ctx context.Context, r *http.Request) context.Context {
 		ctx = opentracing.FromHTTPRequest(tracer, operationName, logger)(ctx, r)

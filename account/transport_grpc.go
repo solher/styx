@@ -2,6 +2,7 @@ package account
 
 import (
 	"github.com/go-kit/kit/log"
+	_ "github.com/solher/styx/account/client/grpc"
 
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/golang/protobuf/ptypes"
