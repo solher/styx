@@ -8,23 +8,22 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	"time"
 
-	"google.golang.org/grpc"
-
-	zipkin "github.com/openzipkin/zipkin-go-opentracing"
-
 	"github.com/fsnotify/fsnotify"
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	stdopentracing "github.com/opentracing/opentracing-go"
+	zipkin "github.com/openzipkin/zipkin-go-opentracing"
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/solher/styx/account"
 	"github.com/solher/styx/authorization"
 	"github.com/solher/styx/config"
@@ -32,6 +31,7 @@ import (
 	"github.com/solher/styx/memory"
 	"github.com/solher/styx/pb"
 	"github.com/solher/styx/redis"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -53,8 +53,9 @@ const (
 	defaultRedirectURLQueryParam = "redirectUrl"
 	defaultRequestURLHeader      = "Request-Url"
 	// Transport domain.
-	defaultHTTPAddr = ":3000"
-	defaultGRPCAddr = ":8082"
+	defaultDebugAddr = ":8080"
+	defaultHTTPAddr  = ":8081"
+	defaultGRPCAddr  = ":8082"
 	// Config watcher.
 	defaultConfigFile = "./config.yml"
 )
@@ -79,8 +80,9 @@ func main() {
 		redirectURLQueryParamEnv = envString("REDIRECT_URL_QUERY_PARAM", defaultRedirectURLQueryParam)
 		requestURLHeaderEnv      = envString("REQUEST_URL_HEADER", defaultRequestURLHeader)
 		// Transport domain.
-		httpAddrEnv = envString("HTTP_ADDR", defaultHTTPAddr)
-		grpcAddrEnv = envString("GRPC_ADDR", defaultGRPCAddr)
+		debugAddrEnv = envString("DEBUG_ADDR", defaultDebugAddr)
+		httpAddrEnv  = envString("HTTP_ADDR", defaultHTTPAddr)
+		grpcAddrEnv  = envString("GRPC_ADDR", defaultGRPCAddr)
 		// Config watcher.
 		configFileEnv = envString("CONFIG_FILE", defaultConfigFile)
 	)
@@ -104,8 +106,9 @@ func main() {
 		redirectURLQueryParam = flag.String("redirectURLQueryParam", redirectURLQueryParamEnv, "The query parameter where the redirect URL (the original user request URL) is set")
 		requestURLHeader      = flag.String("requestURLHeader", requestURLHeaderEnv, "The HTTP header to get the URL requested by the user")
 		// Transport domain.
-		httpAddr = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
-		grpcAddr = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
+		debugAddr = flag.String("debugAddr", debugAddrEnv, "Debug, health and metrics listen address")
+		httpAddr  = flag.String("httpAddr", httpAddrEnv, "HTTP listen address")
+		grpcAddr  = flag.String("grpcAddr", grpcAddrEnv, "gRPC (HTTP) listen address")
 		// Config watcher.
 		configFile = flag.String("configFile", configFileEnv, "Config file location")
 	)
@@ -232,7 +235,42 @@ func main() {
 	ctx := context.Background()
 	errc := make(chan error)
 
-	// Transport domain.
+	// Debug transport.
+	debugMux := chi.NewRouter()
+	debugMux.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+	debugMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/debug/pprof/")
+		w.WriteHeader(307)
+	})
+	debugMux.HandleFunc("/debug/pprof/", pprof.Index)
+	debugMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	debugMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	debugMux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	debugMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+	debugMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	debugMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	debugMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	debugMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	debugMux.Handle("/metrics", stdprometheus.Handler())
+
+	debugConn, err := net.Listen("tcp", *debugAddr)
+	if err != nil {
+		logger.Log("err", errors.Wrap(err, "could not create a TCP connection"))
+		exitCode = 1
+		return
+	}
+	defer debugConn.Close()
+	logger.Log("msg", "listening on "+*debugAddr+" (debug)")
+	go func() {
+		if err := http.Serve(debugConn, debugMux); err != nil {
+			errc <- errors.Wrap(err, "the http server returned an error")
+			return
+		}
+	}()
+
+	// HTTP transport.
 	authorizationHandler := authorization.MakeHTTPHandler(
 		ctx,
 		authorizationEndpoints,
@@ -248,10 +286,9 @@ func main() {
 	)
 	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
 
-	r := chi.NewRouter()
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
-	r.Mount("/auth", authorizationHandler)
-	r.Mount("/account", accountHandler)
+	httpMux := chi.NewRouter()
+	httpMux.Mount("/auth", authorizationHandler)
+	httpMux.Mount("/account", accountHandler)
 
 	httpConn, err := net.Listen("tcp", *httpAddr)
 	if err != nil {
@@ -262,12 +299,13 @@ func main() {
 	defer httpConn.Close()
 	logger.Log("msg", "listening on "+*httpAddr+" (HTTP)")
 	go func() {
-		if err := http.Serve(httpConn, r); err != nil {
+		if err := http.Serve(httpConn, httpMux); err != nil {
 			errc <- errors.Wrap(err, "the http server returned an error")
 			return
 		}
 	}()
 
+	// gRPC transport.
 	grpcServer := grpc.NewServer()
 	pb.RegisterAccountServer(grpcServer, account.MakeGRPCServer(ctx, accountEndpoints, tracer, logger))
 
