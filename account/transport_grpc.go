@@ -2,7 +2,7 @@ package account
 
 import (
 	"github.com/go-kit/kit/log"
-	_ "github.com/solher/styx/account/client/grpc"
+	client "github.com/solher/styx/account/client/grpc"
 
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/golang/protobuf/ptypes"
@@ -167,6 +167,11 @@ func EncodeGRPCDeleteSessionsByOwnerTokenResponse(_ context.Context, response in
 func toPBError(err error) string {
 	if err == nil {
 		return ""
+	}
+	if _, _, ok := isErrValidation(err); ok {
+		return client.ErrValidation.Error()
+	} else if isErrNotFound(err) {
+		return client.ErrNotFound.Error()
 	}
 	return err.Error()
 }

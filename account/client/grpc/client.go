@@ -1,18 +1,18 @@
 package grpc
 
 import (
-	"context"
-
-	"github.com/go-kit/kit/log"
-	"github.com/solher/styx/helpers"
-
-	jujuratelimit "github.com/juju/ratelimit"
-
 	"github.com/go-kit/kit/circuitbreaker"
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/examples/addsvc/pb"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/ratelimit"
 	"github.com/go-kit/kit/tracing/opentracing"
+	grpctransport "github.com/go-kit/kit/transport/grpc"
+	jujuratelimit "github.com/juju/ratelimit"
+	stdopentracing "github.com/opentracing/opentracing-go"
+	"github.com/solher/styx/helpers"
+	"github.com/solher/styx/pb"
+	"github.com/sony/gobreaker"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -20,7 +20,7 @@ var noop = func(_ context.Context, r interface{}) (interface{}, error) {
 	return r, nil
 }
 
-// New returns an AddService backed by a gRPC client connection. It is the
+// New returns an Account service backed by a gRPC client connection. It is the
 // responsibility of the caller to dial, and later close, the connection.
 func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger, opts ...Option) Service {
 	clientOpts := &options{
@@ -30,7 +30,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 	for _, opt := range opts {
 		opt(clientOpts)
 	}
-	limiter := ratelimit.NewTokenBucketLimiter(jujuratelimit.NewBucketWithRate(limiterRate, limiterCapacity))
+	limiter := ratelimit.NewTokenBucketLimiter(jujuratelimit.NewBucketWithRate(clientOpts.limiterRate, clientOpts.limiterCapacity))
 	circuitbreaker := circuitbreaker.Gobreaker(gobreaker.NewCircuitBreaker(gobreaker.Settings{Name: "Account"}))
 	var createSessionEndpoint endpoint.Endpoint
 	{

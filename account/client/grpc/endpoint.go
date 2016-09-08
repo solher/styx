@@ -18,7 +18,8 @@ type Endpoints struct {
 	DeleteSessionsByOwnerTokenEndpoint endpoint.Endpoint
 }
 
-func (e *Endpoints) CreateSession(ctx context.Context, session *pb.Session) (*pb.Session, error) {
+// CreateSession implements Service.
+func (e Endpoints) CreateSession(ctx context.Context, session *pb.Session) (*pb.Session, error) {
 	req := &pb.CreateSessionRequest{
 		Session: session,
 	}
@@ -30,7 +31,8 @@ func (e *Endpoints) CreateSession(ctx context.Context, session *pb.Session) (*pb
 	return res.Session, toError(res.Err)
 }
 
-func (e *Endpoints) FindSessionByToken(ctx context.Context, token string) (*pb.Session, error) {
+// FindSessionByToken implements Service.
+func (e Endpoints) FindSessionByToken(ctx context.Context, token string) (*pb.Session, error) {
 	req := &pb.FindSessionByTokenRequest{
 		Token: token,
 	}
@@ -42,7 +44,8 @@ func (e *Endpoints) FindSessionByToken(ctx context.Context, token string) (*pb.S
 	return res.Session, toError(res.Err)
 }
 
-func (e *Endpoints) DeleteSessionByToken(ctx context.Context, token string) (*pb.Session, error) {
+// DeleteSessionByToken implements Service.
+func (e Endpoints) DeleteSessionByToken(ctx context.Context, token string) (*pb.Session, error) {
 	req := &pb.DeleteSessionByTokenRequest{
 		Token: token,
 	}
@@ -54,7 +57,8 @@ func (e *Endpoints) DeleteSessionByToken(ctx context.Context, token string) (*pb
 	return res.Session, toError(res.Err)
 }
 
-func (e *Endpoints) DeleteSessionsByOwnerToken(ctx context.Context, ownerToken string) ([]*pb.Session, error) {
+// DeleteSessionsByOwnerToken implements Service.
+func (e Endpoints) DeleteSessionsByOwnerToken(ctx context.Context, ownerToken string) ([]*pb.Session, error) {
 	req := &pb.DeleteSessionsByOwnerTokenRequest{
 		OwnerToken: ownerToken,
 	}
@@ -63,7 +67,7 @@ func (e *Endpoints) DeleteSessionsByOwnerToken(ctx context.Context, ownerToken s
 		return nil, err
 	}
 	res := response.(*pb.DeleteSessionsByOwnerTokenReply)
-	return res.Session, toError(res.Err)
+	return res.Sessions, toError(res.Err)
 }
 
 func toError(err string) error {
