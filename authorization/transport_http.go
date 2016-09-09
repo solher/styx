@@ -51,7 +51,7 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 	)
 
 	r := chi.NewRouter()
-	r.Post("/authorizeToken", authorizeTokenHandler.ServeHTTP)
+	r.Get("/authorizeToken", authorizeTokenHandler.ServeHTTP)
 	r.Get("/redirect", redirectHandler.ServeHTTP)
 
 	return r
