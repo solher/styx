@@ -11,7 +11,7 @@ RUN go get ./... \
 && go build -v \
 && cp styx /usr/local/bin \
 && mkdir -p /app \
-&& touch /app/config.yml
+&& touch /app/config.yml \
 && apk del git \
 && rm -rf /go/*
 
