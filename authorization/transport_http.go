@@ -40,7 +40,11 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		endpoints.AuthorizeTokenEndpoint,
 		DecodeHTTPAuthorizeTokenRequest(handlerOpts.accessTokenCookie, handlerOpts.accessTokenHeader, handlerOpts.requestURLHeader),
 		EncodeHTTPAuthorizeTokenResponse(handlerOpts.accessTokenHeader, handlerOpts.payloadHeader, handlerOpts.sessionHeader),
-		append(transportOpts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Authorize token", logger)))...,
+		append(
+			transportOpts,
+			httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Authorize token", logger)),
+			httptransport.ServerAfter(helpers.ToHTTPResponse(tracer, logger)),
+		)...,
 	)
 	redirectHandler := httptransport.NewServer(
 		ctx,
@@ -173,7 +177,7 @@ func EncodeHTTPAuthorizeTokenResponse(accessTokenHeader, payloadHeader, sessionH
 			w.Header().Add(sessionHeader, enc)
 		}
 
-		defer helpers.TraceStatusAndFinish(ctx, 204)
+		defer helpers.TraceStatusAndFinish(ctx, w.Header(), 204)
 		w.WriteHeader(204)
 		return nil
 	}
@@ -206,7 +210,7 @@ func EncodeHTTPRedirectResponse(redirectURLHeader, redirectURLQueryParam string)
 		w.Header().Add("Location", fmt.Sprintf("%s?%s=%s", res.RedirectURL, redirectURLQueryParam, res.RequestURL))
 		w.Header().Add(redirectURLHeader, res.RequestURL)
 
-		defer helpers.TraceStatusAndFinish(ctx, 307)
+		defer helpers.TraceStatusAndFinish(ctx, w.Header(), 307)
 		w.WriteHeader(307)
 		return nil
 	}
@@ -220,7 +224,7 @@ func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter)
 		return err
 	}
 
-	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
+	defer helpers.TraceAPIErrorAndFinish(ctx, w.Header(), apiError)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)
 	json.NewEncoder(w).Encode(apiError)

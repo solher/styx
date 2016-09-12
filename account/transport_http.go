@@ -81,7 +81,7 @@ func EncodeHTTPCreateSessionResponse(ctx context.Context, w http.ResponseWriter,
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, 201)
+	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 201)
 	encodeSession(w, res.Session, 201)
 	return nil
 }
@@ -101,7 +101,7 @@ func EncodeHTTPFindSessionByTokenResponse(ctx context.Context, w http.ResponseWr
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, 200)
+	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 200)
 	encodeSession(w, res.Session, 200)
 	return nil
 }
@@ -121,7 +121,7 @@ func EncodeHTTPDeleteSessionByTokenResponse(ctx context.Context, w http.Response
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, 200)
+	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 200)
 	encodeSession(w, res.Session, 200)
 	return nil
 }
@@ -145,7 +145,7 @@ func EncodeHTTPDeleteSessionsByOwnerTokenResponse(ctx context.Context, w http.Re
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, 200)
+	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 200)
 	encodeSessions(w, res.Sessions, 200)
 	return nil
 }
@@ -162,7 +162,7 @@ func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter)
 		return err
 	}
 
-	defer helpers.TraceAPIErrorAndFinish(ctx, apiError)
+	defer helpers.TraceAPIErrorAndFinish(ctx, w.Header(), apiError)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)
 	json.NewEncoder(w).Encode(apiError)

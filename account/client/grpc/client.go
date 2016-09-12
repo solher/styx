@@ -44,6 +44,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 			grpctransport.ClientBefore(helpers.ToGRPCRequest(tracer, logger)),
 		).Endpoint()
 		createSessionEndpoint = opentracing.TraceClient(tracer, "Create session")(createSessionEndpoint)
+		createSessionEndpoint = helpers.EndpointTracingMiddleware(createSessionEndpoint)
 		createSessionEndpoint = limiter(createSessionEndpoint)
 		createSessionEndpoint = circuitbreaker(createSessionEndpoint)
 	}
@@ -59,6 +60,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 			grpctransport.ClientBefore(helpers.ToGRPCRequest(tracer, logger)),
 		).Endpoint()
 		findSessionByTokenEndpoint = opentracing.TraceClient(tracer, "Find session by token")(findSessionByTokenEndpoint)
+		findSessionByTokenEndpoint = helpers.EndpointTracingMiddleware(findSessionByTokenEndpoint)
 		findSessionByTokenEndpoint = limiter(findSessionByTokenEndpoint)
 		findSessionByTokenEndpoint = circuitbreaker(findSessionByTokenEndpoint)
 	}
@@ -74,6 +76,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 			grpctransport.ClientBefore(helpers.ToGRPCRequest(tracer, logger)),
 		).Endpoint()
 		deleteSessionByTokenEndpoint = opentracing.TraceClient(tracer, "Delete session by token")(deleteSessionByTokenEndpoint)
+		deleteSessionByTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionByTokenEndpoint)
 		deleteSessionByTokenEndpoint = limiter(deleteSessionByTokenEndpoint)
 		deleteSessionByTokenEndpoint = circuitbreaker(deleteSessionByTokenEndpoint)
 	}
@@ -89,6 +92,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 			grpctransport.ClientBefore(helpers.ToGRPCRequest(tracer, logger)),
 		).Endpoint()
 		deleteSessionsByOwnerTokenEndpoint = opentracing.TraceClient(tracer, "Delete sessions by owner token")(deleteSessionsByOwnerTokenEndpoint)
+		deleteSessionsByOwnerTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
 		deleteSessionsByOwnerTokenEndpoint = limiter(deleteSessionsByOwnerTokenEndpoint)
 		deleteSessionsByOwnerTokenEndpoint = circuitbreaker(deleteSessionsByOwnerTokenEndpoint)
 	}
