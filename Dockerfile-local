@@ -1,0 +1,10 @@
+FROM alpine:latest
+ 
+RUN mkdir -p /app && touch /app/config.yml
+COPY ./styx /usr/local/bin
+
+WORKDIR /
+
+ENV CONFIG_FILE=/app/config.yml
+EXPOSE 8080 8081 8082
+ENTRYPOINT ["styx"]
