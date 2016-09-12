@@ -7,7 +7,7 @@ import (
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
-	"github.com/solher/styx/helpers"
+	"github.com/solher/kitty"
 	"github.com/solher/styx/sessions"
 	"golang.org/x/net/context"
 
@@ -19,7 +19,7 @@ import (
 // on predefined paths.
 func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) http.Handler {
 	opts := []httptransport.ServerOption{
-		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
+		httptransport.ServerErrorEncoder(kitty.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
 	}
 	createSessionHandler := httptransport.NewServer(
@@ -27,28 +27,28 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		endpoints.CreateSessionEndpoint,
 		DecodeHTTPCreateSessionRequest,
 		EncodeHTTPCreateSessionResponse,
-		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Create session", logger)))...,
+		append(opts, httptransport.ServerBefore(kitty.FromHTTPRequest(tracer, "Create session", logger)))...,
 	)
 	findSessionByTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.FindSessionByTokenEndpoint,
 		DecodeHTTPFindSessionByTokenRequest,
 		EncodeHTTPFindSessionByTokenResponse,
-		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Find session by token", logger)))...,
+		append(opts, httptransport.ServerBefore(kitty.FromHTTPRequest(tracer, "Find session by token", logger)))...,
 	)
 	deleteSessionByTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.DeleteSessionByTokenEndpoint,
 		DecodeHTTPDeleteSessionByTokenRequest,
 		EncodeHTTPDeleteSessionByTokenResponse,
-		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Delete session by token", logger)))...,
+		append(opts, httptransport.ServerBefore(kitty.FromHTTPRequest(tracer, "Delete session by token", logger)))...,
 	)
 	deleteSessionByOwnerTokenHandler := httptransport.NewServer(
 		ctx,
 		endpoints.DeleteSessionsByOwnerTokenEndpoint,
 		DecodeHTTPDeleteSessionsByOwnerTokenRequest,
 		EncodeHTTPDeleteSessionsByOwnerTokenResponse,
-		append(opts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Delete session by owner token", logger)))...,
+		append(opts, httptransport.ServerBefore(kitty.FromHTTPRequest(tracer, "Delete session by owner token", logger)))...,
 	)
 
 	r := chi.NewRouter()
@@ -67,7 +67,7 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 func DecodeHTTPCreateSessionRequest(_ context.Context, r *http.Request) (interface{}, error) {
 	session := &sessions.Session{}
 	if err := json.NewDecoder(r.Body).Decode(session); err != nil {
-		return nil, helpers.WithErrBodyDecoding(errors.Wrap(err, "could not decode the session"))
+		return nil, kitty.WithErrBodyDecoding(errors.Wrap(err, "could not decode the session"))
 	}
 	return createSessionRequest{
 		Session: session,
@@ -81,7 +81,7 @@ func EncodeHTTPCreateSessionResponse(ctx context.Context, w http.ResponseWriter,
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 201)
+	defer kitty.TraceStatusAndFinish(ctx, w.Header(), 201)
 	encodeSession(w, res.Session, 201)
 	return nil
 }
@@ -101,7 +101,7 @@ func EncodeHTTPFindSessionByTokenResponse(ctx context.Context, w http.ResponseWr
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 200)
+	defer kitty.TraceStatusAndFinish(ctx, w.Header(), 200)
 	encodeSession(w, res.Session, 200)
 	return nil
 }
@@ -121,7 +121,7 @@ func EncodeHTTPDeleteSessionByTokenResponse(ctx context.Context, w http.Response
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 200)
+	defer kitty.TraceStatusAndFinish(ctx, w.Header(), 200)
 	encodeSession(w, res.Session, 200)
 	return nil
 }
@@ -131,7 +131,7 @@ func EncodeHTTPDeleteSessionByTokenResponse(ctx context.Context, w http.Response
 func DecodeHTTPDeleteSessionsByOwnerTokenRequest(ctx context.Context, r *http.Request) (interface{}, error) {
 	values, ok := r.URL.Query()["ownerToken"]
 	if !ok {
-		return nil, helpers.WithErrQueryParam(errors.New("ownerToken parameter is required"), "ownerToken")
+		return nil, kitty.WithErrQueryParam(errors.New("ownerToken parameter is required"), "ownerToken")
 	}
 	return deleteSessionsByOwnerTokenRequest{
 		OwnerToken: values[0],
@@ -145,24 +145,24 @@ func EncodeHTTPDeleteSessionsByOwnerTokenResponse(ctx context.Context, w http.Re
 	if res.Err != nil {
 		return businessErrorEncoder(ctx, res.Err, w)
 	}
-	defer helpers.TraceStatusAndFinish(ctx, w.Header(), 200)
+	defer kitty.TraceStatusAndFinish(ctx, w.Header(), 200)
 	encodeSessions(w, res.Sessions, 200)
 	return nil
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
-	var apiError helpers.APIError
+	var apiError kitty.APIError
 	if field, reason, ok := isErrValidation(err); ok {
-		apiError = helpers.APIValidation
+		apiError = kitty.APIValidation
 		apiError.Params["field"] = field
 		apiError.Params["reason"] = reason
 	} else if isErrNotFound(err) {
-		apiError = helpers.APIForbidden
+		apiError = kitty.APIForbidden
 	} else {
 		return err
 	}
 
-	defer helpers.TraceAPIErrorAndFinish(ctx, w.Header(), apiError)
+	defer kitty.TraceAPIErrorAndFinish(ctx, w.Header(), apiError)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)
 	json.NewEncoder(w).Encode(apiError)

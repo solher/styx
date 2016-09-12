@@ -24,10 +24,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
+	"github.com/solher/kitty"
 	"github.com/solher/styx/account"
 	"github.com/solher/styx/authorization"
 	"github.com/solher/styx/config"
-	"github.com/solher/styx/helpers"
 	"github.com/solher/styx/memory"
 	"github.com/solher/styx/pb"
 	"github.com/solher/styx/redis"
@@ -190,12 +190,12 @@ func main() {
 	var authorizeTokenEndpoint endpoint.Endpoint
 	{
 		authorizeTokenEndpoint = authorization.MakeAuthorizeTokenEndpoint(authorizationService)
-		authorizeTokenEndpoint = helpers.EndpointTracingMiddleware(authorizeTokenEndpoint)
+		authorizeTokenEndpoint = kitty.EndpointTracingMiddleware(authorizeTokenEndpoint)
 	}
 	var redirectEndpoint endpoint.Endpoint
 	{
 		redirectEndpoint = authorization.MakeRedirectEndpoint(authorizationService)
-		redirectEndpoint = helpers.EndpointTracingMiddleware(redirectEndpoint)
+		redirectEndpoint = kitty.EndpointTracingMiddleware(redirectEndpoint)
 	}
 	authorizationEndpoints := authorization.Endpoints{
 		AuthorizeTokenEndpoint: authorizeTokenEndpoint,
@@ -205,24 +205,24 @@ func main() {
 	var createSessionEndpoint endpoint.Endpoint
 	{
 		createSessionEndpoint = account.MakeCreateSessionEndpoint(accountService)
-		createSessionEndpoint = helpers.EndpointTracingMiddleware(createSessionEndpoint)
+		createSessionEndpoint = kitty.EndpointTracingMiddleware(createSessionEndpoint)
 	}
 	var findSessionByTokenEndpoint endpoint.Endpoint
 	{
 		findSessionByTokenEndpoint = account.MakeFindSessionByTokenEndpoint(accountService)
-		findSessionByTokenEndpoint = helpers.EndpointTracingMiddleware(findSessionByTokenEndpoint)
+		findSessionByTokenEndpoint = kitty.EndpointTracingMiddleware(findSessionByTokenEndpoint)
 
 	}
 	var deleteSessionByTokenEndpoint endpoint.Endpoint
 	{
 		deleteSessionByTokenEndpoint = account.MakeDeleteSessionByTokenEndpoint(accountService)
-		deleteSessionByTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionByTokenEndpoint)
+		deleteSessionByTokenEndpoint = kitty.EndpointTracingMiddleware(deleteSessionByTokenEndpoint)
 
 	}
 	var deleteSessionsByOwnerTokenEndpoint endpoint.Endpoint
 	{
 		deleteSessionsByOwnerTokenEndpoint = account.MakeDeleteSessionsByOwnerTokenEndpoint(accountService)
-		deleteSessionsByOwnerTokenEndpoint = helpers.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
+		deleteSessionsByOwnerTokenEndpoint = kitty.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
 	}
 	accountEndpoints := account.Endpoints{
 		CreateSessionEndpoint:              createSessionEndpoint,

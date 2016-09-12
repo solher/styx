@@ -9,7 +9,7 @@ import (
 
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/pressly/chi"
-	"github.com/solher/styx/helpers"
+	"github.com/solher/kitty"
 	"golang.org/x/net/context"
 
 	"github.com/go-kit/kit/log"
@@ -20,7 +20,7 @@ import (
 // on predefined paths.
 func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger, opts ...HTTPHandlerOption) http.Handler {
 	transportOpts := []httptransport.ServerOption{
-		httptransport.ServerErrorEncoder(helpers.TransportErrorEncoder),
+		httptransport.ServerErrorEncoder(kitty.TransportErrorEncoder),
 		httptransport.ServerErrorLogger(logger),
 	}
 	handlerOpts := &httpHandlerOptions{
@@ -42,8 +42,8 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		EncodeHTTPAuthorizeTokenResponse(handlerOpts.accessTokenHeader, handlerOpts.payloadHeader, handlerOpts.sessionHeader),
 		append(
 			transportOpts,
-			httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Authorize token", logger)),
-			httptransport.ServerAfter(helpers.ToHTTPResponse(tracer, logger)),
+			httptransport.ServerBefore(kitty.FromHTTPRequest(tracer, "Authorize token", logger)),
+			httptransport.ServerAfter(kitty.ToHTTPResponse(tracer, logger)),
 		)...,
 	)
 	redirectHandler := httptransport.NewServer(
@@ -51,7 +51,7 @@ func MakeHTTPHandler(ctx context.Context, endpoints Endpoints, tracer stdopentra
 		endpoints.RedirectEndpoint,
 		DecodeHTTPRedirectRequest(handlerOpts.requestURLHeader),
 		EncodeHTTPRedirectResponse(handlerOpts.redirectURLHeader, handlerOpts.redirectURLQueryParam),
-		append(transportOpts, httptransport.ServerBefore(helpers.FromHTTPRequest(tracer, "Redirect URL", logger)))...,
+		append(transportOpts, httptransport.ServerBefore(kitty.FromHTTPRequest(tracer, "Redirect URL", logger)))...,
 	)
 
 	r := chi.NewRouter()
@@ -177,7 +177,7 @@ func EncodeHTTPAuthorizeTokenResponse(accessTokenHeader, payloadHeader, sessionH
 			w.Header().Add(sessionHeader, enc)
 		}
 
-		defer helpers.TraceStatusAndFinish(ctx, w.Header(), 204)
+		defer kitty.TraceStatusAndFinish(ctx, w.Header(), 204)
 		w.WriteHeader(204)
 		return nil
 	}
@@ -210,21 +210,21 @@ func EncodeHTTPRedirectResponse(redirectURLHeader, redirectURLQueryParam string)
 		w.Header().Add("Location", fmt.Sprintf("%s?%s=%s", res.RedirectURL, redirectURLQueryParam, res.RequestURL))
 		w.Header().Add(redirectURLHeader, res.RequestURL)
 
-		defer helpers.TraceStatusAndFinish(ctx, w.Header(), 307)
+		defer kitty.TraceStatusAndFinish(ctx, w.Header(), 307)
 		w.WriteHeader(307)
 		return nil
 	}
 }
 
 func businessErrorEncoder(ctx context.Context, err error, w http.ResponseWriter) error {
-	var apiError helpers.APIError
+	var apiError kitty.APIError
 	if isErrDeniedAccess(err) {
-		apiError = helpers.APIUnauthorized
+		apiError = kitty.APIUnauthorized
 	} else {
 		return err
 	}
 
-	defer helpers.TraceAPIErrorAndFinish(ctx, w.Header(), apiError)
+	defer kitty.TraceAPIErrorAndFinish(ctx, w.Header(), apiError)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(apiError.Status)
 	json.NewEncoder(w).Encode(apiError)

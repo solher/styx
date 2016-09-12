@@ -7,12 +7,13 @@ import (
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/golang/protobuf/ptypes"
 	stdopentracing "github.com/opentracing/opentracing-go"
-	"github.com/solher/styx/helpers"
+	"github.com/solher/kitty"
 	"github.com/solher/styx/pb"
 	"github.com/solher/styx/sessions"
 	"golang.org/x/net/context"
 )
 
+// MakeGRPCServer makes a set of endpoints available as a gRPC server.
 func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) pb.AccountServer {
 	opts := []grpctransport.ServerOption{
 		grpctransport.ServerErrorLogger(logger),
@@ -25,8 +26,8 @@ func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentrac
 			EncodeGRPCCreateSessionResponse,
 			append(
 				opts,
-				grpctransport.ServerBefore(helpers.FromGRPCRequest(tracer, "Create session", logger)),
-				grpctransport.ServerAfter(helpers.GRPCFinish()),
+				grpctransport.ServerBefore(kitty.FromGRPCRequest(tracer, "Create session", logger)),
+				grpctransport.ServerAfter(kitty.GRPCFinish()),
 			)...,
 		),
 		findSessionByToken: grpctransport.NewServer(
@@ -36,8 +37,8 @@ func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentrac
 			EncodeGRPCFindSessionByTokenResponse,
 			append(
 				opts,
-				grpctransport.ServerBefore(helpers.FromGRPCRequest(tracer, "Find session by token", logger)),
-				grpctransport.ServerAfter(helpers.GRPCFinish()),
+				grpctransport.ServerBefore(kitty.FromGRPCRequest(tracer, "Find session by token", logger)),
+				grpctransport.ServerAfter(kitty.GRPCFinish()),
 			)...,
 		),
 		deleteSessionByToken: grpctransport.NewServer(
@@ -47,8 +48,8 @@ func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentrac
 			EncodeGRPCDeleteSessionByTokenResponse,
 			append(
 				opts,
-				grpctransport.ServerBefore(helpers.FromGRPCRequest(tracer, "Delete session by token", logger)),
-				grpctransport.ServerAfter(helpers.GRPCFinish()),
+				grpctransport.ServerBefore(kitty.FromGRPCRequest(tracer, "Delete session by token", logger)),
+				grpctransport.ServerAfter(kitty.GRPCFinish()),
 			)...,
 		),
 		deleteSessionsByOwnerToken: grpctransport.NewServer(
@@ -58,8 +59,8 @@ func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentrac
 			EncodeGRPCDeleteSessionsByOwnerTokenResponse,
 			append(
 				opts,
-				grpctransport.ServerBefore(helpers.FromGRPCRequest(tracer, "Delete sessions by owner token", logger)),
-				grpctransport.ServerAfter(helpers.GRPCFinish()),
+				grpctransport.ServerBefore(kitty.FromGRPCRequest(tracer, "Delete sessions by owner token", logger)),
+				grpctransport.ServerAfter(kitty.GRPCFinish()),
 			)...,
 		),
 	}
@@ -104,6 +105,8 @@ func (s *grpcServer) DeleteSessionsByOwnerToken(ctx context.Context, req *pb.Del
 	return rep.(*pb.DeleteSessionsByOwnerTokenReply), nil
 }
 
+// DecodeGRPCCreateSessionRequest is a transport/grpc.DecodeRequestFunc that converts a
+// gRPC request to a user-domain request.
 func DecodeGRPCCreateSessionRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(*pb.CreateSessionRequest)
 	return createSessionRequest{
@@ -111,6 +114,8 @@ func DecodeGRPCCreateSessionRequest(_ context.Context, request interface{}) (int
 	}, nil
 }
 
+// EncodeGRPCCreateSessionResponse is a transport/grpc.EncodeResponseFunc that converts a
+// user-domain response to a gRPC reply.
 func EncodeGRPCCreateSessionResponse(_ context.Context, response interface{}) (interface{}, error) {
 	res := response.(createSessionResponse)
 	return &pb.CreateSessionReply{
@@ -119,6 +124,8 @@ func EncodeGRPCCreateSessionResponse(_ context.Context, response interface{}) (i
 	}, nil
 }
 
+// DecodeGRPCFindSessionByTokenRequest is a transport/grpc.DecodeRequestFunc that converts a
+// gRPC request to a user-domain request.
 func DecodeGRPCFindSessionByTokenRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(*pb.FindSessionByTokenRequest)
 	return findSessionByTokenRequest{
@@ -126,6 +133,8 @@ func DecodeGRPCFindSessionByTokenRequest(_ context.Context, request interface{})
 	}, nil
 }
 
+// EncodeGRPCFindSessionByTokenResponse is a transport/grpc.EncodeResponseFunc that converts a
+// user-domain response to a gRPC reply.
 func EncodeGRPCFindSessionByTokenResponse(_ context.Context, response interface{}) (interface{}, error) {
 	res := response.(findSessionByTokenResponse)
 	return &pb.FindSessionByTokenReply{
@@ -134,6 +143,8 @@ func EncodeGRPCFindSessionByTokenResponse(_ context.Context, response interface{
 	}, nil
 }
 
+// DecodeGRPCDeleteSessionByTokenRequest is a transport/grpc.DecodeRequestFunc that converts a
+// gRPC request to a user-domain request.
 func DecodeGRPCDeleteSessionByTokenRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(*pb.DeleteSessionByTokenRequest)
 	return deleteSessionByTokenRequest{
@@ -141,6 +152,8 @@ func DecodeGRPCDeleteSessionByTokenRequest(_ context.Context, request interface{
 	}, nil
 }
 
+// EncodeGRPCDeleteSessionByTokenResponse is a transport/grpc.EncodeResponseFunc that converts a
+// user-domain response to a gRPC reply.
 func EncodeGRPCDeleteSessionByTokenResponse(_ context.Context, response interface{}) (interface{}, error) {
 	res := response.(deleteSessionByTokenResponse)
 	return &pb.DeleteSessionByTokenReply{
@@ -149,6 +162,8 @@ func EncodeGRPCDeleteSessionByTokenResponse(_ context.Context, response interfac
 	}, nil
 }
 
+// DecodeGRPCDeleteSessionsByOwnerTokenRequest is a transport/grpc.DecodeRequestFunc that converts a
+// gRPC request to a user-domain request.
 func DecodeGRPCDeleteSessionsByOwnerTokenRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(*pb.DeleteSessionsByOwnerTokenRequest)
 	return deleteSessionsByOwnerTokenRequest{
@@ -156,6 +171,8 @@ func DecodeGRPCDeleteSessionsByOwnerTokenRequest(_ context.Context, request inte
 	}, nil
 }
 
+// EncodeGRPCDeleteSessionsByOwnerTokenResponse is a transport/grpc.EncodeResponseFunc that converts a
+// user-domain response to a gRPC reply.
 func EncodeGRPCDeleteSessionsByOwnerTokenResponse(_ context.Context, response interface{}) (interface{}, error) {
 	res := response.(deleteSessionsByOwnerTokenResponse)
 	return &pb.DeleteSessionsByOwnerTokenReply{
