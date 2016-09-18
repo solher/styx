@@ -122,7 +122,7 @@ func TestAuthorizeToken(t *testing.T) {
 		{
 			name:     "no policies in session",
 			hostname: simpleResource.Hostname, path: "", token: "F00bAr",
-			policyRepoFindByNamePolicy: simpleGrantPolicy, policyRepoFindByNameError: nil,
+			policyRepoFindByNamePolicy: simpleGrantPolicy, policyRepoFindByNameError: policies.WithErrNotFound(errors.New("policy not found")),
 			resourceRepoFindByHostnameResource: simpleResource, resourceRepoFindByHostnameError: nil,
 			sessionRepoFindByTokenSession: emptyPoliciesSession, sessionRepoFindByTokenError: nil,
 			session: nil, errorExpected: true,

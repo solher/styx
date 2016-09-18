@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -55,6 +56,10 @@ func (s *service) Redirect(ctx context.Context, hostname string) (string, error)
 
 // AuthorizeToken authorizes a given token to access a given URL.
 func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token string) (*sessions.Session, error) {
+	fmt.Println(hostname)
+	fmt.Println(path)
+	fmt.Println(token)
+
 	resourceCh, resourceErrCh := make(chan *resources.Resource, 1), make(chan error, 1)
 	sessionCh, sessionErrCh := make(chan *sessions.Session, 1), make(chan error, 1)
 	go func() {
@@ -99,8 +104,21 @@ func (s *service) AuthorizeToken(ctx context.Context, hostname, path, token stri
 		}
 		return nil, err
 	}
+	foundSession := <-sessionCh
 	// If a session is found, we try to authorize it
-	return s.authorizeSession(ctx, path, resource.Name, <-sessionCh)
+	session, err := s.authorizeSession(ctx, path, resource.Name, foundSession)
+	if err != nil {
+		// If denied, we at least try to authorize as guest
+		if isErrDeniedAccess(err) {
+			if _, err := s.authorizeGuestSession(ctx, path, resource.Name); err != nil {
+				return nil, err
+			}
+			return foundSession, nil
+		}
+		return nil, err
+	}
+	// If found, we return it
+	return session, nil
 }
 
 func (s *service) authorizeSession(ctx context.Context, path, resource string, session *sessions.Session) (*sessions.Session, error) {
@@ -112,6 +130,7 @@ func (s *service) authorizeSession(ctx context.Context, path, resource string, s
 			policy, err := s.policyRepo.FindByName(ctx, policyName)
 			if err != nil {
 				errCh <- err
+				return
 			}
 			// We check the permissions
 			errCh <- s.checkPermissions(policy, path, resource, policyName)

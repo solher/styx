@@ -166,15 +166,12 @@ func EncodeHTTPAuthorizeTokenResponse(accessTokenHeader, payloadHeader, sessionH
 		w.Header().Add(accessTokenHeader, res.Token)
 		if res.Session != nil {
 			if res.Session.Payload != nil {
-				payload := base64.StdEncoding.EncodeToString(res.Session.Payload)
-				w.Header().Add(payloadHeader, payload)
+				w.Header().Add(payloadHeader, base64.StdEncoding.EncodeToString(res.Session.Payload))
 			}
-
 			res.Session.Policies = nil
 			res.Session.Payload = nil
 			s, _ := json.Marshal(res.Session)
-			enc := base64.StdEncoding.EncodeToString(s)
-			w.Header().Add(sessionHeader, enc)
+			w.Header().Add(sessionHeader, base64.StdEncoding.EncodeToString(s))
 		}
 
 		defer kitty.TraceStatusAndFinish(ctx, w.Header(), 204)
