@@ -1,6 +1,6 @@
 package grpc
 
-import "errors"
+import "github.com/pkg/errors"
 
 var (
 	// ErrNotFound is returned when the specified resource was not found.

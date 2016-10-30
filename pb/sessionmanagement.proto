@@ -13,7 +13,7 @@ message Session {
   bytes payload = 8;
 }
 
-service Account {
+service Sessionmanagement {
   rpc CreateSession (CreateSessionRequest) returns (CreateSessionReply) {}
   rpc FindSessionByToken (FindSessionByTokenRequest) returns (FindSessionByTokenReply) {}
   rpc DeleteSessionByToken (DeleteSessionByTokenRequest) returns (DeleteSessionByTokenReply) {}

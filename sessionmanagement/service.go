@@ -1,4 +1,4 @@
-package account
+package sessionmanagement
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/solher/styx/sessions"
 )
 
-// Service represents the account service interface.
+// Service represents the session management service interface.
 type Service interface {
 	CreateSession(ctx context.Context, session *sessions.Session) (*sessions.Session, error)
 	FindSessionByToken(ctx context.Context, token string) (*sessions.Session, error)
@@ -19,7 +19,7 @@ type service struct {
 	sessionRepo sessions.Repository
 }
 
-// NewService returns a new instance of the account service.
+// NewService returns a new instance of the session management service.
 func NewService(sessionRepo sessions.Repository) Service {
 	return &service{
 		sessionRepo: sessionRepo,

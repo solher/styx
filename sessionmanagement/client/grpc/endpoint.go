@@ -8,7 +8,7 @@ import (
 	"github.com/solher/styx/pb"
 )
 
-// Endpoints collects all of the endpoints that compose an account service. It's
+// Endpoints collects all of the endpoints that compose a session management service. It's
 // meant to be used as a helper struct, to collect all of the endpoints into a
 // single parameter.
 type Endpoints struct {

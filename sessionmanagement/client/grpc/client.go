@@ -20,7 +20,7 @@ var noop = func(_ context.Context, r interface{}) (interface{}, error) {
 	return r, nil
 }
 
-// New returns an Account service backed by a gRPC client connection. It is the
+// New returns a session management service backed by a gRPC client connection. It is the
 // responsibility of the caller to dial, and later close, the connection.
 func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger, opts ...Option) Service {
 	clientOpts := &options{
@@ -31,12 +31,12 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 		opt(clientOpts)
 	}
 	limiter := ratelimit.NewTokenBucketLimiter(jujuratelimit.NewBucketWithRate(clientOpts.limiterRate, clientOpts.limiterCapacity))
-	circuitbreaker := circuitbreaker.Gobreaker(gobreaker.NewCircuitBreaker(gobreaker.Settings{Name: "Account"}))
+	circuitbreaker := circuitbreaker.Gobreaker(gobreaker.NewCircuitBreaker(gobreaker.Settings{Name: "SessionManagement"}))
 	var createSessionEndpoint endpoint.Endpoint
 	{
 		createSessionEndpoint = grpctransport.NewClient(
 			conn,
-			"Account",
+			"SessionManagement",
 			"CreateSession",
 			noop,
 			noop,
@@ -52,7 +52,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 	{
 		findSessionByTokenEndpoint = grpctransport.NewClient(
 			conn,
-			"Account",
+			"SessionManagement",
 			"FindSessionByToken",
 			noop,
 			noop,
@@ -68,7 +68,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 	{
 		deleteSessionByTokenEndpoint = grpctransport.NewClient(
 			conn,
-			"Account",
+			"SessionManagement",
 			"DeleteSessionByToken",
 			noop,
 			noop,
@@ -84,7 +84,7 @@ func New(conn *grpc.ClientConn, tracer stdopentracing.Tracer, logger log.Logger,
 	{
 		deleteSessionsByOwnerTokenEndpoint = grpctransport.NewClient(
 			conn,
-			"Account",
+			"SessionManagement",
 			"DeleteSessionsByOwnerToken",
 			noop,
 			noop,

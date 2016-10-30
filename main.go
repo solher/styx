@@ -25,12 +25,12 @@ import (
 	"github.com/pressly/chi"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/solher/kitty"
-	"github.com/solher/styx/account"
 	"github.com/solher/styx/authorization"
 	"github.com/solher/styx/config"
 	"github.com/solher/styx/memory"
 	"github.com/solher/styx/pb"
 	"github.com/solher/styx/redis"
+	"github.com/solher/styx/sessionmanagement"
 	"google.golang.org/grpc"
 )
 
@@ -41,7 +41,7 @@ const (
 	defaultRedisAddr    = "redis:6379"
 	defaultRedisMaxConn = 16
 	// Business domain.
-	// Account service.
+	// Session management service.
 	defaultDefaultTokenLength     = 64
 	defaultDefaultSessionValidity = 24 * time.Hour
 	// Authorization service.
@@ -68,7 +68,7 @@ func main() {
 		redisAddrEnv    = envString("REDIS_ADDR", defaultRedisAddr)
 		redisMaxConnEnv = envInt("REDIS_MAX_CONN", defaultRedisMaxConn)
 		// Business domain.
-		// Account service.
+		// Session management service.
 		defaultTokenLengthEnv     = envInt("DEFAULT_TOKEN_LENGTH", defaultDefaultTokenLength)
 		defaultSessionValidityEnv = envDuration("DEFAULT_SESSION_VALIDITY", defaultDefaultSessionValidity)
 		// Authorization service.
@@ -94,7 +94,7 @@ func main() {
 		redisAddr    = flag.String("redisAddr", redisAddrEnv, "Redis server address")
 		redisMaxConn = flag.Int("redisMaxConn", redisMaxConnEnv, "Max simultaneous connections to Redis")
 		// Business domain.
-		// Account service.
+		// Session management service.
 		defaultTokenLength     = flag.Int("defaultTokenLength", defaultTokenLengthEnv, "The default session token length")
 		defaultSessionValidity = flag.Duration("defaultSessionValidity", defaultSessionValidityEnv, "The default session validity duration")
 		// Authorization service.
@@ -181,9 +181,9 @@ func main() {
 	{
 		authorizationService = authorization.NewService(policyRepo, resourceRepo, sessionRepo)
 	}
-	var accountService account.Service
+	var sessionmanagementService sessionmanagement.Service
 	{
-		accountService = account.NewService(sessionRepo)
+		sessionmanagementService = sessionmanagement.NewService(sessionRepo)
 	}
 
 	// Endpoint domain.
@@ -204,27 +204,27 @@ func main() {
 
 	var createSessionEndpoint endpoint.Endpoint
 	{
-		createSessionEndpoint = account.MakeCreateSessionEndpoint(accountService)
+		createSessionEndpoint = sessionmanagement.MakeCreateSessionEndpoint(sessionmanagementService)
 		createSessionEndpoint = kitty.EndpointTracingMiddleware(createSessionEndpoint)
 	}
 	var findSessionByTokenEndpoint endpoint.Endpoint
 	{
-		findSessionByTokenEndpoint = account.MakeFindSessionByTokenEndpoint(accountService)
+		findSessionByTokenEndpoint = sessionmanagement.MakeFindSessionByTokenEndpoint(sessionmanagementService)
 		findSessionByTokenEndpoint = kitty.EndpointTracingMiddleware(findSessionByTokenEndpoint)
 
 	}
 	var deleteSessionByTokenEndpoint endpoint.Endpoint
 	{
-		deleteSessionByTokenEndpoint = account.MakeDeleteSessionByTokenEndpoint(accountService)
+		deleteSessionByTokenEndpoint = sessionmanagement.MakeDeleteSessionByTokenEndpoint(sessionmanagementService)
 		deleteSessionByTokenEndpoint = kitty.EndpointTracingMiddleware(deleteSessionByTokenEndpoint)
 
 	}
 	var deleteSessionsByOwnerTokenEndpoint endpoint.Endpoint
 	{
-		deleteSessionsByOwnerTokenEndpoint = account.MakeDeleteSessionsByOwnerTokenEndpoint(accountService)
+		deleteSessionsByOwnerTokenEndpoint = sessionmanagement.MakeDeleteSessionsByOwnerTokenEndpoint(sessionmanagementService)
 		deleteSessionsByOwnerTokenEndpoint = kitty.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
 	}
-	accountEndpoints := account.Endpoints{
+	sessionmanagementEndpoints := sessionmanagement.Endpoints{
 		CreateSessionEndpoint:              createSessionEndpoint,
 		FindSessionByTokenEndpoint:         findSessionByTokenEndpoint,
 		DeleteSessionByTokenEndpoint:       deleteSessionByTokenEndpoint,
@@ -284,11 +284,11 @@ func main() {
 		authorization.RedirectURLQueryParam(*redirectURLQueryParam),
 		authorization.RequestURLHeader(*requestURLHeader),
 	)
-	accountHandler := account.MakeHTTPHandler(ctx, accountEndpoints, tracer, logger)
+	sessionmanagementHandler := sessionmanagement.MakeHTTPHandler(ctx, sessionmanagementEndpoints, tracer, logger)
 
 	httpMux := chi.NewRouter()
 	httpMux.Mount("/auth", authorizationHandler)
-	httpMux.Mount("/account", accountHandler)
+	httpMux.Mount("/sessionmanagement", sessionmanagementHandler)
 
 	httpConn, err := net.Listen("tcp", *httpAddr)
 	if err != nil {
@@ -307,7 +307,7 @@ func main() {
 
 	// gRPC transport.
 	grpcServer := grpc.NewServer()
-	pb.RegisterAccountServer(grpcServer, account.MakeGRPCServer(ctx, accountEndpoints, tracer, logger))
+	pb.RegisterSessionmanagementServer(grpcServer, sessionmanagement.MakeGRPCServer(ctx, sessionmanagementEndpoints, tracer, logger))
 
 	grpcConn, err := net.Listen("tcp", *grpcAddr)
 	if err != nil {

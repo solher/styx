@@ -1,4 +1,4 @@
-package account
+package sessionmanagement
 
 import (
 	"encoding/json"

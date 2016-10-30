@@ -1,8 +1,8 @@
-package account
+package sessionmanagement
 
 import (
 	"github.com/go-kit/kit/log"
-	client "github.com/solher/styx/account/client/grpc"
+	client "github.com/solher/styx/sessionmanagement/client/grpc"
 
 	grpctransport "github.com/go-kit/kit/transport/grpc"
 	"github.com/golang/protobuf/ptypes"
@@ -14,7 +14,7 @@ import (
 )
 
 // MakeGRPCServer makes a set of endpoints available as a gRPC server.
-func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) pb.AccountServer {
+func MakeGRPCServer(ctx context.Context, endpoints Endpoints, tracer stdopentracing.Tracer, logger log.Logger) pb.SessionmanagementServer {
 	opts := []grpctransport.ServerOption{
 		grpctransport.ServerErrorLogger(logger),
 	}

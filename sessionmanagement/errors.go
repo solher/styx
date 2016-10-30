@@ -1,4 +1,4 @@
-package account
+package sessionmanagement
 
 type errNotFound interface {
 	error

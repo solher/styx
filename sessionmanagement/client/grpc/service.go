@@ -6,7 +6,7 @@ import (
 	"github.com/solher/styx/pb"
 )
 
-// Service represents the account service interface.
+// Service represents the session management service interface.
 type Service interface {
 	CreateSession(ctx context.Context, session *pb.Session) (*pb.Session, error)
 	FindSessionByToken(ctx context.Context, token string) (*pb.Session, error)
