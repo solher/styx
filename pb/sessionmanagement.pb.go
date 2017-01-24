@@ -72,6 +72,48 @@ func (m *Session) GetValidTo() *google_protobuf.Timestamp {
 	return nil
 }
 
+func (m *Session) GetToken() string {
+	if m != nil {
+		return m.Token
+	}
+	return ""
+}
+
+func (m *Session) GetOwnerToken() string {
+	if m != nil {
+		return m.OwnerToken
+	}
+	return ""
+}
+
+func (m *Session) GetAgent() string {
+	if m != nil {
+		return m.Agent
+	}
+	return ""
+}
+
+func (m *Session) GetIp() string {
+	if m != nil {
+		return m.Ip
+	}
+	return ""
+}
+
+func (m *Session) GetPolicies() []string {
+	if m != nil {
+		return m.Policies
+	}
+	return nil
+}
+
+func (m *Session) GetPayload() []byte {
+	if m != nil {
+		return m.Payload
+	}
+	return nil
+}
+
 type CreateSessionRequest struct {
 	Session *Session `protobuf:"bytes,1,opt,name=session" json:"session,omitempty"`
 }
@@ -105,6 +147,13 @@ func (m *CreateSessionReply) GetSession() *Session {
 	return nil
 }
 
+func (m *CreateSessionReply) GetErr() string {
+	if m != nil {
+		return m.Err
+	}
+	return ""
+}
+
 type FindSessionByTokenRequest struct {
 	Token string `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 }
@@ -113,6 +162,13 @@ func (m *FindSessionByTokenRequest) Reset()                    { *m = FindSessio
 func (m *FindSessionByTokenRequest) String() string            { return proto.CompactTextString(m) }
 func (*FindSessionByTokenRequest) ProtoMessage()               {}
 func (*FindSessionByTokenRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *FindSessionByTokenRequest) GetToken() string {
+	if m != nil {
+		return m.Token
+	}
+	return ""
+}
 
 type FindSessionByTokenReply struct {
 	Session *Session `protobuf:"bytes,1,opt,name=session" json:"session,omitempty"`
@@ -131,6 +187,13 @@ func (m *FindSessionByTokenReply) GetSession() *Session {
 	return nil
 }
 
+func (m *FindSessionByTokenReply) GetErr() string {
+	if m != nil {
+		return m.Err
+	}
+	return ""
+}
+
 type DeleteSessionByTokenRequest struct {
 	Token string `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 }
@@ -139,6 +202,13 @@ func (m *DeleteSessionByTokenRequest) Reset()                    { *m = DeleteSe
 func (m *DeleteSessionByTokenRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeleteSessionByTokenRequest) ProtoMessage()               {}
 func (*DeleteSessionByTokenRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+
+func (m *DeleteSessionByTokenRequest) GetToken() string {
+	if m != nil {
+		return m.Token
+	}
+	return ""
+}
 
 type DeleteSessionByTokenReply struct {
 	Session *Session `protobuf:"bytes,1,opt,name=session" json:"session,omitempty"`
@@ -157,6 +227,13 @@ func (m *DeleteSessionByTokenReply) GetSession() *Session {
 	return nil
 }
 
+func (m *DeleteSessionByTokenReply) GetErr() string {
+	if m != nil {
+		return m.Err
+	}
+	return ""
+}
+
 type DeleteSessionsByOwnerTokenRequest struct {
 	OwnerToken string `protobuf:"bytes,1,opt,name=owner_token,json=ownerToken" json:"owner_token,omitempty"`
 }
@@ -166,6 +243,13 @@ func (m *DeleteSessionsByOwnerTokenRequest) String() string { return proto.Compa
 func (*DeleteSessionsByOwnerTokenRequest) ProtoMessage()    {}
 func (*DeleteSessionsByOwnerTokenRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor0, []int{7}
+}
+
+func (m *DeleteSessionsByOwnerTokenRequest) GetOwnerToken() string {
+	if m != nil {
+		return m.OwnerToken
+	}
+	return ""
 }
 
 type DeleteSessionsByOwnerTokenReply struct {
@@ -183,6 +267,13 @@ func (m *DeleteSessionsByOwnerTokenReply) GetSessions() []*Session {
 		return m.Sessions
 	}
 	return nil
+}
+
+func (m *DeleteSessionsByOwnerTokenReply) GetErr() string {
+	if m != nil {
+		return m.Err
+	}
+	return ""
 }
 
 func init() {
@@ -203,7 +294,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion3
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Sessionmanagement service
 
@@ -365,7 +456,7 @@ var _Sessionmanagement_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor0,
+	Metadata: "sessionmanagement.proto",
 }
 
 func init() { proto.RegisterFile("sessionmanagement.proto", fileDescriptor0) }
