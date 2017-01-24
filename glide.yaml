@@ -1,0 +1,36 @@
+package: github.com/solher/styx
+import:
+- package: github.com/fsnotify/fsnotify
+- package: github.com/garyburd/redigo
+  subpackages:
+  - redis
+- package: github.com/go-kit/kit
+  version: 0.3.0
+  subpackages:
+  - circuitbreaker
+  - endpoint
+  - log
+  - ratelimit
+  - tracing/opentracing
+  - transport/grpc
+  - transport/http
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
+  - ptypes
+  - ptypes/timestamp
+- package: github.com/juju/ratelimit
+- package: github.com/opentracing/opentracing-go
+- package: github.com/openzipkin/zipkin-go-opentracing
+- package: github.com/pkg/errors
+- package: github.com/pressly/chi
+- package: github.com/prometheus/client_golang
+  subpackages:
+  - prometheus
+- package: github.com/solher/kitty
+- package: github.com/sony/gobreaker
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: google.golang.org/grpc
+- package: gopkg.in/yaml.v2
