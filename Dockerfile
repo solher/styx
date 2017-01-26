@@ -7,7 +7,8 @@ RUN apk add --update git \
 COPY . $SRC_PATH
 WORKDIR $SRC_PATH
 
-RUN go get ./... \
+RUN go get -u github.com/Masterminds/glide \
+&& /go/bin/glide install \
 && go build -v \
 && cp styx /usr/local/bin \
 && mkdir -p /app \

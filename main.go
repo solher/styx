@@ -224,7 +224,7 @@ func main() {
 		deleteSessionsByOwnerTokenEndpoint = sessionmanagement.MakeDeleteSessionsByOwnerTokenEndpoint(sessionmanagementService)
 		deleteSessionsByOwnerTokenEndpoint = kitty.EndpointTracingMiddleware(deleteSessionsByOwnerTokenEndpoint)
 	}
-	sessionmanagementEndpoints := sessionmanagement.Endpoints{
+	sessionManagementEndpoints := sessionmanagement.Endpoints{
 		CreateSessionEndpoint:              createSessionEndpoint,
 		FindSessionByTokenEndpoint:         findSessionByTokenEndpoint,
 		DeleteSessionByTokenEndpoint:       deleteSessionByTokenEndpoint,
@@ -284,11 +284,11 @@ func main() {
 		authorization.RedirectURLQueryParam(*redirectURLQueryParam),
 		authorization.RequestURLHeader(*requestURLHeader),
 	)
-	sessionmanagementHandler := sessionmanagement.MakeHTTPHandler(ctx, sessionmanagementEndpoints, tracer, logger)
+	sessionManagementHandler := sessionmanagement.MakeHTTPHandler(ctx, sessionManagementEndpoints, tracer, logger)
 
 	httpMux := chi.NewRouter()
 	httpMux.Mount("/auth", authorizationHandler)
-	httpMux.Mount("/sessionmanagement", sessionmanagementHandler)
+	httpMux.Mount("/sessionmanagement", sessionManagementHandler)
 
 	httpConn, err := net.Listen("tcp", *httpAddr)
 	if err != nil {
@@ -307,7 +307,7 @@ func main() {
 
 	// gRPC transport.
 	grpcServer := grpc.NewServer()
-	pb.RegisterSessionmanagementServer(grpcServer, sessionmanagement.MakeGRPCServer(ctx, sessionmanagementEndpoints, tracer, logger))
+	pb.RegisterSessionManagementServer(grpcServer, sessionmanagement.MakeGRPCServer(ctx, sessionManagementEndpoints, tracer, logger))
 
 	grpcConn, err := net.Listen("tcp", *grpcAddr)
 	if err != nil {
