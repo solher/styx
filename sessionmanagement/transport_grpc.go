@@ -1,6 +1,8 @@
 package sessionmanagement
 
 import (
+	"time"
+
 	"github.com/go-kit/kit/log"
 	client "github.com/solher/styx/sessionmanagement/client/grpc"
 
@@ -194,6 +196,9 @@ func toPBError(err error) string {
 }
 
 func toPBSession(session *sessions.Session) *pb.Session {
+	if session == nil {
+		return nil
+	}
 	return toPBSessions([]sessions.Session{*session})[0]
 }
 
@@ -216,17 +221,27 @@ func toPBSessions(sessions []sessions.Session) []*pb.Session {
 }
 
 func toSession(pbSession *pb.Session) *sessions.Session {
+	if pbSession == nil {
+		return nil
+	}
 	return &toSessions([]*pb.Session{pbSession})[0]
 }
 
 func toSessions(pbSessions []*pb.Session) []sessions.Session {
 	sessionSl := make([]sessions.Session, len(pbSessions))
 	for i, n := range pbSessions {
-		created, _ := ptypes.Timestamp(n.Created)
-		validTo, _ := ptypes.Timestamp(n.ValidTo)
+		var created, validTo *time.Time
+		if n.Created != nil {
+			c, _ := ptypes.Timestamp(n.Created)
+			created = &c
+		}
+		if n.ValidTo != nil {
+			v, _ := ptypes.Timestamp(n.ValidTo)
+			validTo = &v
+		}
 		sessionSl[i] = sessions.Session{
-			Created:    &created,
-			ValidTo:    &validTo,
+			Created:    created,
+			ValidTo:    validTo,
 			Token:      n.Token,
 			OwnerToken: n.OwnerToken,
 			Agent:      n.Agent,
