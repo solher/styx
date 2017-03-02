@@ -215,6 +215,7 @@ func toPBSessions(sessions []sessions.Session) []*pb.Session {
 			Agent:      n.Agent,
 			Ip:         n.IP,
 			Policies:   n.Policies,
+			Payload:    n.Payload,
 		}
 	}
 	return pbSessionSl
@@ -247,6 +248,7 @@ func toSessions(pbSessions []*pb.Session) []sessions.Session {
 			Agent:      n.Agent,
 			IP:         n.Ip,
 			Policies:   n.Policies,
+			Payload:    n.Payload,
 		}
 	}
 	return sessionSl
